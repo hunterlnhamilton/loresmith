@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Loresmith — a LoreForge-style worldbuilding and story manager for Obsidian.
+ * Loresmith — a worldbuilding and story manager for Obsidian.
  * Everything is stored as ordinary markdown notes with frontmatter, so the
  * vault stays readable without the plugin (Dataview, Bases, graph, Novelr).
  */
@@ -765,7 +765,7 @@ function genResolve(st, g) {
 const GEN_REPO = 'hunterlnhamilton/loresmith';
 const GEN_REPO_DIR = 'generators';
 function genTableNamesIn(text) {
-  return [...String(text).matchAll(/^Table:\s*(.+?)\s*$/gm)].map((m) => m[1]);
+  return [...String(text).matchAll(/^[ \t]*Table:[ \t]*(.+?)[ \t]*$/gim)].map((m) => m[1]);
 }
 /* Every table name the generators can ask for, with {family} filled in for each genre. */
 function genAllTables() {
@@ -4691,20 +4691,30 @@ class LoresmithPlugin extends Plugin {
     return (r && r.api) || null;
   }
 
-  /* Every table name Randomness knows, lower-cased, kept for a few seconds. Empty when the API can't list them. */
+  /*
+   * Every table in the vault's generator files: lower-cased name → the file that defines it. Read from the .rdm and
+   * .ipt files themselves (only under Randomness's Generator root when it has one, the same files Randomness reads),
+   * because Randomness's own table list leaves out tables marked Hidden:, and the audience versions are hidden.
+   */
+  async genScanTables() {
+    if (this._genScan && Date.now() - this._genScan.at < 5000) return this._genScan.map;
+    const r = this.app.plugins && this.app.plugins.plugins && this.app.plugins.plugins.randomness;
+    const root = String((r && r.settings && r.settings.generatorRoot) || '').trim().replace(/\/+$/, '');
+    const map = new Map();
+    const files = this.app.vault.getFiles().filter((f) => /\.(rdm|ipt)$/i.test(f.path)
+      && (!root || f.path === root || f.path.startsWith(root + '/')));
+    files.sort((a, b) => a.path.localeCompare(b.path));
+    for (const f of files) {
+      let text = '';
+      try { text = await this.app.vault.cachedRead(f); } catch (e) { continue; }
+      for (const n of genTableNamesIn(text)) if (!map.has(n.toLowerCase())) map.set(n.toLowerCase(), f.path);
+    }
+    this._genScan = { at: Date.now(), map };
+    return map;
+  }
+
   async genTableNames() {
-    if (this._genNames && Date.now() - this._genNames.at < 5000) return this._genNames.set;
-    const set = new Set();
-    const api = this.randomness();
-    try {
-      const list = api && (api.tablesWithSources ? await api.tablesWithSources() : api.tables ? await api.tables() : null);
-      for (const t of Array.isArray(list) ? list : []) {
-        const n = typeof t === 'string' ? t : t && (t.name || t.table || t.tableName);
-        if (n) set.add(String(n).toLowerCase());
-      }
-    } catch (e) { /* listing is only a shortcut; rolling tells us the rest */ }
-    this._genNames = { at: Date.now(), set };
-    return set;
+    return new Set((await this.genScanTables()).keys());
   }
 
   /* Roll the first of these tables that exists. Throws with Randomness's own message when none does. */
@@ -4907,22 +4917,14 @@ class LoresmithPlugin extends Plugin {
 
   /* Table name (lower case) → the vault file that defines it. */
   async genTableSources() {
-    const map = new Map();
-    const api = this.randomness();
-    if (!api || !api.tablesWithSources) return map;
-    try {
-      for (const t of (await api.tablesWithSources()) || []) {
-        if (t && t.name && !map.has(t.name.toLowerCase())) map.set(t.name.toLowerCase(), t.filePath || t.source || '');
-      }
-    } catch (e) { /* treat as unknown */ }
-    return map;
+    this._genScan = null;
+    return this.genScanTables();
   }
 
   /* Tables the generators use that Randomness can't find. Empty when it can't list its tables. */
   async genMissingTables() {
-    const api = this.randomness();
-    if (!api || !api.tablesWithSources) return [];
-    this._genNames = null;
+    if (!this.randomness()) return [];
+    this._genScan = null;
     const known = await this.genTableNames();
     return genAllTables().filter((n) => !known.has(n.toLowerCase()));
   }
@@ -4988,7 +4990,7 @@ class LoresmithPlugin extends Plugin {
       }
       this.settings.generatorFiles = record;
       await this.saveSettings();
-      this._genNames = null;
+      this._genScan = null;
       notice.hide();
       const parts = [];
       if (rep.added.length) parts.push(`added ${rep.added.length}`);
