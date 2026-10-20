@@ -1,0 +1,199 @@
+// Randomness generator file — Mystery & Crime subgenres.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll it from any note with `rdm:[@Mystery]`
+Title: Mystery Genres
+Use: Conflicts.rdm
+
+Table: Mystery
+[@Mystery Tone] [@Mystery Subgenre]
+
+Table: Mystery Tone
+Hidden:
+Cozy
+Hardboiled
+Noir
+Procedural
+Literary
+Comic
+
+Table: Mystery Subgenre
+Hidden:
+[@Mystery Detective]
+[@Mystery Crime]
+[@Mystery Puzzle]
+[@Mystery Flavor]
+
+Table: Mystery Detective
+Hidden:
+Amateur Sleuth
+Private Investigator
+Police Procedural
+Forensic Mystery
+Legal / Courtroom
+Professional Sleuth
+
+Table: Mystery Crime
+Hidden:
+Heist / Caper
+Organized Crime
+Criminal Protagonist
+Revenge Story
+Cold Case
+
+Table: Mystery Puzzle
+Hidden:
+Locked Room
+Whodunit
+Inverted / Howcatchem
+Closed Circle
+Impossible Crime
+
+Table: Mystery Flavor
+Hidden:
+Historical Mystery
+Paranormal Mystery
+Culinary Mystery
+Small-Town Mystery
+Nordic Noir
+Tart Noir
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Mystery Plot Tropes
+The Body in the Library
+Everyone Has a Motive
+The Unreliable Witness
+The Red Herring Suspect
+Cold Case Reopened
+The Detective Is Framed
+Locked-Room Murder
+The Victim Wasn't Who They Seemed
+A Second Murder Mid-Investigation
+The Final Gathering of Suspects
+The Killer Is Someone Trusted
+The Clue Hidden in Plain Sight
+
+Table: Mystery Character Tropes
+Eccentric Genius Detective
+Plucky Amateur Sleuth
+Burned-Out Cop
+Loyal Sidekick
+Femme / Homme Fatale
+Rival Investigator
+The Wrongly Accused
+The Too-Helpful Witness
+Retired Expert
+Journalist Who Digs Too Deep
+
+Table: Mystery Locations
+a snowbound country manor
+a sleepy seaside village
+a rain-slick city precinct
+an old university campus
+a luxury cruise ship
+a theatre on opening night
+an exclusive private club
+a vineyard estate
+a small-town bakery
+a Victorian London backstreet
+
+Table: Mystery Conflicts
+a wealthy patriarch is poisoned at dinner
+a decades-old disappearance resurfaces
+a serial killer leaves cryptic clues
+a priceless artifact vanishes from a locked vault
+an innocent person faces trial
+a string of deaths are ruled accidents
+a blackmailer is found dead
+a key witness vanishes before testifying
+
+// ---- Audience variants: used by the Story Seed template ----
+// MG = Middle Grade. Young Adult and Adult seeds use the tables above.
+
+Table: Mystery MG
+[@Mystery Tone MG] [@Mystery Subgenre MG]
+
+Table: Mystery Tone MG
+Hidden:
+Cozy
+Procedural
+Literary
+Comic
+
+Table: Mystery Subgenre MG
+Hidden:
+[@Mystery Detective MG]
+[@Mystery Puzzle]
+[@Mystery Flavor MG]
+
+Table: Mystery Detective MG
+Hidden:
+3: Amateur Sleuth
+Kid Detective Club
+Private Investigator
+Professional Sleuth
+
+Table: Mystery Flavor MG
+Hidden:
+Historical Mystery
+Paranormal Mystery
+Culinary Mystery
+Small-Town Mystery
+
+Table: Mystery Plot Tropes MG
+Hidden:
+The Vanishing Treasure
+Everyone Has a Motive
+The Unreliable Witness
+The Red Herring Suspect
+Cold Case Reopened
+The Sleuth Is Blamed
+The Locked-Room Theft
+The Victim Wasn't Who They Seemed
+A Second Clue Changes Everything
+The Final Gathering of Suspects
+The Culprit Is Someone Trusted
+The Clue Hidden in Plain Sight
+
+Table: Mystery Character Tropes MG
+Hidden:
+Eccentric Genius Detective
+Plucky Amateur Sleuth
+Loyal Sidekick
+Rival Investigator
+The Wrongly Accused
+The Too-Helpful Witness
+Retired Expert
+Kid Reporter for the School Paper
+
+Table: Mystery Conflicts MG
+Hidden:
+the school's prize trophy disappears
+a beloved pet goes missing
+a mysterious note arrives every week
+a priceless artifact vanishes from a locked case
+a friend is blamed for something they didn't do
+someone is sabotaging the town fair
+an old map points to a hidden room
+a neighbour vanishes without a word
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Mystery conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Mystery Conflict Mix
+1: [@Mystery Conflicts]
+1: [@Conflicts]
+
+Table: Mystery Conflict Mix YA
+Hidden:
+1: [@Mystery Conflicts]
+1: [@Conflicts YA]
+
+Table: Mystery Conflict Mix MG
+Hidden:
+1: [@Mystery Conflicts MG]
+1: [@Conflicts MG]

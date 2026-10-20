@@ -1,0 +1,27 @@
+// Randomness generator file — rolls across every genre file.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// The Use: lines pull in each genre file by name,
+// wherever it lives under your Generator root.
+// Roll it from any note with `rdm:[@Genres]`
+// or a two-genre mashup with `rdm:[@Genre Mashup]`
+Title: Genres
+Use: Fantasy.rdm
+Use: Science Fiction.rdm
+Use: Horror.rdm
+Use: Mystery.rdm
+Use: Thriller.rdm
+Use: Romance.rdm
+Use: Historical.rdm
+
+Table: Genres
+[@Fantasy]
+[@Science Fiction]
+[@Horror]
+[@Mystery]
+[@Thriller]
+[@Romance]
+[@Historical]
+
+Table: Genre Mashup
+[@Genres] meets [@Genres]

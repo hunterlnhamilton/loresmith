@@ -1,0 +1,177 @@
+// Randomness generator file — conflicts that fit any genre.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Each genre file mixes these with its own conflicts (its "Conflict Mix"
+// tables), so a Horror seed can roll either a Horror conflict or one of these.
+//
+// Three lists, one per audience. When you add a conflict, add it to every
+// list it suits:
+//   Conflicts     — everything (New Adult and Adult)
+//   Conflicts YA  — no pregnancy, forced marriage, spouses, impairment or
+//                   end-of-life decisions
+//   Conflicts MG  — as YA, plus no romance, assault or workplace trouble
+// Roll from any note with `rdm:[@Conflicts]`
+Title: Conflicts
+
+Table: Conflicts
+A Car Accident
+A Competitor Showing Up
+A Deadline Being Moved Up
+A Delay that Makes One Late
+A Divorce or Breakup
+A Partner Being Unwilling to Commit
+A Romantic Competitor Entering the Scene
+A Repressed Memory Resurfacing
+An Elderly Parent Requiring Care
+An Estranged Relative Showing Up
+An Unexpected Pregnancy
+An Unwanted Romantic Advance
+Bad Weather
+Being Assigned an Undesirable Partner
+Being Blackmailed
+Being Falsely Accused
+Being Forced to Marry
+Being Forced to Move
+Being Given an Ultimatum
+Being Given Bad News
+Being Ignored or Blown Off
+Being Mistaken for Someone Else
+Being Offered an Easy Way Out
+Being Physically Assaulted by a Stranger
+Being Sabotaged
+Being Turned Down by a Potential Love Interest
+Being Unable to Save Everyone
+Being Unprepared
+Confiding In the Wrong Person
+Discovering a Spouse’s Secret
+Discrimination or Harassment
+Doing Something Stupid While Impaired
+Experiencing a Crisis of Self-Doubt
+Facing a Challenge Beyond One’s Knowledge or Skill
+Failing at Something
+Family Secrets Being Revealed
+Getting Caught in a Lie
+Having Feelings for Someone Who is Off-Limits
+Having to Work with an Enemy
+Lacking an Important Resource
+Losing a Bet
+Losing a Job
+Losing a Phone
+Losing One’s Temper
+Misaligned Goals
+Nepotism at Work
+Peer Pressure
+Physical Exhaustion
+Public Humiliation
+Pulling the Plug on Someone
+Running Out of Critical Supplies
+Seeing an Ex with Someone New
+Sending a Private Message to the Wrong Person
+Taking Advice from the Wrong Person
+The Death of a Pet
+Unknowingly Sharing Incorrect Information
+Unwanted Scrutiny
+Wrong Place, Wrong Time
+
+Table: Conflicts YA
+Hidden:
+A Car Accident
+A Competitor Showing Up
+A Deadline Being Moved Up
+A Delay that Makes One Late
+A Divorce or Breakup
+A Partner Being Unwilling to Commit
+A Romantic Competitor Entering the Scene
+A Repressed Memory Resurfacing
+An Elderly Parent Requiring Care
+An Estranged Relative Showing Up
+An Unwanted Romantic Advance
+Bad Weather
+Being Assigned an Undesirable Partner
+Being Blackmailed
+Being Falsely Accused
+Being Forced to Move
+Being Given an Ultimatum
+Being Given Bad News
+Being Ignored or Blown Off
+Being Mistaken for Someone Else
+Being Offered an Easy Way Out
+Being Physically Assaulted by a Stranger
+Being Sabotaged
+Being Turned Down by a Potential Love Interest
+Being Unable to Save Everyone
+Being Unprepared
+Confiding In the Wrong Person
+Discrimination or Harassment
+Experiencing a Crisis of Self-Doubt
+Facing a Challenge Beyond One’s Knowledge or Skill
+Failing at Something
+Family Secrets Being Revealed
+Getting Caught in a Lie
+Having Feelings for Someone Who is Off-Limits
+Having to Work with an Enemy
+Lacking an Important Resource
+Losing a Bet
+Losing a Job
+Losing a Phone
+Losing One’s Temper
+Misaligned Goals
+Nepotism at Work
+Peer Pressure
+Physical Exhaustion
+Public Humiliation
+Running Out of Critical Supplies
+Seeing an Ex with Someone New
+Sending a Private Message to the Wrong Person
+Taking Advice from the Wrong Person
+The Death of a Pet
+Unknowingly Sharing Incorrect Information
+Unwanted Scrutiny
+Wrong Place, Wrong Time
+
+Table: Conflicts MG
+Hidden:
+A Car Accident
+A Competitor Showing Up
+A Deadline Being Moved Up
+A Delay that Makes One Late
+A Divorce or Breakup
+A Repressed Memory Resurfacing
+An Elderly Parent Requiring Care
+An Estranged Relative Showing Up
+Bad Weather
+Being Assigned an Undesirable Partner
+Being Blackmailed
+Being Falsely Accused
+Being Forced to Move
+Being Given an Ultimatum
+Being Given Bad News
+Being Ignored or Blown Off
+Being Mistaken for Someone Else
+Being Offered an Easy Way Out
+Being Sabotaged
+Being Unable to Save Everyone
+Being Unprepared
+Confiding In the Wrong Person
+Discrimination or Harassment
+Experiencing a Crisis of Self-Doubt
+Facing a Challenge Beyond One’s Knowledge or Skill
+Failing at Something
+Family Secrets Being Revealed
+Getting Caught in a Lie
+Having to Work with an Enemy
+Lacking an Important Resource
+Losing a Bet
+Losing a Phone
+Losing One’s Temper
+Misaligned Goals
+Peer Pressure
+Physical Exhaustion
+Public Humiliation
+Running Out of Critical Supplies
+Sending a Private Message to the Wrong Person
+Taking Advice from the Wrong Person
+The Death of a Pet
+Unknowingly Sharing Incorrect Information
+Unwanted Scrutiny
+Wrong Place, Wrong Time

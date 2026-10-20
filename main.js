@@ -9,6 +9,7 @@
 const {
   Plugin, ItemView, Modal, SuggestModal, FuzzySuggestModal, PluginSettingTab, Setting,
   Notice, TFile, TFolder, Menu, setIcon, normalizePath, parseYaml, MarkdownRenderer, debounce, Component, Platform,
+  requestUrl,
 } = require('obsidian');
 let CM_VIEW = null;
 try { CM_VIEW = require('@codemirror/view'); } catch (e) { /* hover definitions are optional */ }
@@ -603,6 +604,7 @@ const DEFAULT_SETTINGS = {
   wordLog: {},
   typing: { outside: true, idleSeconds: 30, timeGoal: 0, pomodoro: 25, tab: 'today', kinds: ['scene', 'lore', 'other'], range: 7, metric: 'typed', heat: 'active', story: '' },
   customStructures: {},
+  generatorFiles: {},
 };
 
 /* ------------------------------------------------------------------ */
@@ -756,6 +758,24 @@ function genResolve(st, g) {
   if (fam === 'None' && !g.allowNoFamily) fam = 'Random';
   if (fam === 'Random' || !fam) fam = pick(genFamiliesFor(aud.name));
   return { audience: aud.name, tier: aud.tier, family: fam === 'None' ? '' : fam };
+}
+
+/* Where the generator tables (.rdm files) are published. "Install generator tables" downloads them from the
+   release tag that matches this plugin's version, or from main when there is no such tag, into the vault. */
+const GEN_REPO = 'hunterlnhamilton/loresmith';
+const GEN_REPO_DIR = 'generators';
+function genTableNamesIn(text) {
+  return [...String(text).matchAll(/^Table:\s*(.+?)\s*$/gm)].map((m) => m[1]);
+}
+/* Every table name the generators can ask for, with {family} filled in for each genre. */
+function genAllTables() {
+  const out = new Set();
+  const fields = [...Object.values(GENERATORS).flatMap((g) => g.fields), ...GEN_CHARACTER_FIELDS];
+  for (const f of fields) {
+    if (f.table.includes('{family}')) for (const fam of GEN_FAMILIES) out.add(f.table.replace('{family}', fam).trim());
+    else out.add(f.table);
+  }
+  return [...out];
 }
 
 /* ------------------------------------------------------------------ */
@@ -2210,6 +2230,7 @@ class LoresmithPlugin extends Plugin {
     this.addCommand({ id: 'new-word', name: 'Create dictionary word', callback: () => this.promptCreate('word') });
     this.addCommand({ id: 'new-language', name: 'Create language', callback: () => this.promptCreate('language') });
     this.addCommand({ id: 'name-builder', name: 'Name builder', callback: () => new NameBuilderModal(this.app, this).open() });
+    this.addCommand({ id: 'install-generator-tables', name: 'Install or update generator tables', callback: () => this.installGeneratorTables() });
     for (const [k, g] of Object.entries(GENERATORS)) {
       this.addCommand({ id: `generate-${k}`, name: `Generate: ${g.label.toLowerCase()}`, callback: () => this.openOverview(`gen:${k}`) });
     }
@@ -4875,6 +4896,116 @@ class LoresmithPlugin extends Plugin {
     if (r.two) await add(b, r.two, this.linkTo(a, b));
   }
 
+  /* ---------- generator tables: shipped in the repo, installed into the vault ---------- */
+
+  /* Randomness only reads .rdm files inside the vault, and only under its Generator root when one is set. */
+  genInstallFolder() {
+    const r = this.app.plugins && this.app.plugins.plugins && this.app.plugins.plugins.randomness;
+    const root = String((r && r.settings && r.settings.generatorRoot) || '').trim().replace(/\/+$/, '');
+    return normalizePath(root ? `${root}/Loresmith` : `${this.rootPath()}/Generators`);
+  }
+
+  /* Table name (lower case) → the vault file that defines it. */
+  async genTableSources() {
+    const map = new Map();
+    const api = this.randomness();
+    if (!api || !api.tablesWithSources) return map;
+    try {
+      for (const t of (await api.tablesWithSources()) || []) {
+        if (t && t.name && !map.has(t.name.toLowerCase())) map.set(t.name.toLowerCase(), t.filePath || t.source || '');
+      }
+    } catch (e) { /* treat as unknown */ }
+    return map;
+  }
+
+  /* Tables the generators use that Randomness can't find. Empty when it can't list its tables. */
+  async genMissingTables() {
+    const api = this.randomness();
+    if (!api || !api.tablesWithSources) return [];
+    this._genNames = null;
+    const known = await this.genTableNames();
+    return genAllTables().filter((n) => !known.has(n.toLowerCase()));
+  }
+
+  async genDownload(file, refs) {
+    let last = '';
+    for (const ref of refs) {
+      const url = `https://raw.githubusercontent.com/${GEN_REPO}/${encodeURIComponent(ref)}/${GEN_REPO_DIR}/${encodeURIComponent(file)}`;
+      try {
+        const r = await requestUrl({ url, throw: false });
+        if (r.status === 200) return { text: r.text, ref };
+        last = `HTTP ${r.status}`;
+      } catch (e) { last = String((e && e.message) || e); }
+    }
+    throw new Error(`Couldn't download ${file} from GitHub (${last}).`);
+  }
+
+  /*
+   * Download every table file listed in generators/index.json and write it into the vault.
+   * - New file: added, unless its tables already exist in another file (two copies would make Randomness guess).
+   * - File you haven't touched since it was installed: replaced by the new version.
+   * - File you've edited: left alone; the new version is saved next to it as "<name> (update <version>).txt",
+   *   which Randomness ignores, so you can copy across what you want.
+   */
+  async installGeneratorTables() {
+    if (!this.randomness()) { new Notice('Install and enable the Randomness plugin first.'); return null; }
+    const notice = new Notice('Downloading generator tables…', 0);
+    try {
+      const idx = await this.genDownload('index.json', [this.manifest.version, 'main']);
+      let list;
+      try { list = toArr(JSON.parse(idx.text).files); } catch (e) { throw new Error('generators/index.json is not valid JSON.'); }
+      const folder = this.genInstallFolder();
+      await this.ensureFolder(folder);
+      const known = await this.genTableSources();
+      const record = this.settings.generatorFiles || {};
+      const rep = { added: [], updated: [], same: [], kept: [], skipped: [] };
+      for (const name of list) {
+        const { text } = await this.genDownload(name, [idx.ref]);
+        const path = normalizePath(`${folder}/${name}`);
+        const hash = await sha256(text);
+        const existing = this.app.vault.getAbstractFileByPath(path);
+        if (!existing) {
+          const clash = genTableNamesIn(text).map((n) => known.get(n.toLowerCase())).find((p) => p && normalizePath(p) !== path);
+          if (clash) { rep.skipped.push(`${name} (you already have its tables in ${clash})`); continue; }
+          await this.app.vault.create(path, text);
+          record[name] = { hash, ref: idx.ref };
+          rep.added.push(name);
+          continue;
+        }
+        const cur = await this.app.vault.read(existing);
+        const curHash = await sha256(cur);
+        if (curHash === hash) { record[name] = { hash, ref: idx.ref }; rep.same.push(name); continue; }
+        if (record[name] && record[name].hash === curHash) {
+          await this.app.vault.modify(existing, text);
+          record[name] = { hash, ref: idx.ref };
+          rep.updated.push(name);
+          continue;
+        }
+        const side = normalizePath(`${folder}/${name.replace(/\.rdm$/i, '')} (update ${idx.ref}).txt`);
+        const sf = this.app.vault.getAbstractFileByPath(side);
+        if (sf) await this.app.vault.modify(sf, text); else await this.app.vault.create(side, text);
+        rep.kept.push(name);
+      }
+      this.settings.generatorFiles = record;
+      await this.saveSettings();
+      this._genNames = null;
+      notice.hide();
+      const parts = [];
+      if (rep.added.length) parts.push(`added ${rep.added.length}`);
+      if (rep.updated.length) parts.push(`updated ${rep.updated.length}`);
+      if (rep.same.length) parts.push(`${rep.same.length} already current`);
+      if (rep.kept.length) parts.push(`kept your edits to ${rep.kept.join(', ')} (new versions saved beside them as .txt)`);
+      if (rep.skipped.length) parts.push(`skipped ${rep.skipped.join('; ')}`);
+      new Notice(`Generator tables (${idx.ref}) in ${folder}: ${parts.join('; ') || 'nothing to do'}.`, 12000);
+      return rep;
+    } catch (e) {
+      notice.hide();
+      console.error('Loresmith: installing generator tables', e);
+      new Notice(`Couldn't install generator tables: ${(e && e.message) || e}`, 10000);
+      return null;
+    }
+  }
+
   async createStory(name, data, open) {
     const root = `${this.projectPath()}/${TYPES.story.folder}`;
     await this.ensureFolder(root);
@@ -5277,7 +5408,7 @@ class OverviewView extends ItemView {
       else if (s === 'calendar') await this.renderCalendar(body, idx);
       else if (s === 'meetings') await this.renderMeetings(body, idx);
       else if (s === 'goals') await this.renderWriting(body, idx);
-      else if (s.startsWith('gen:') && GENERATORS[s.slice(4)]) this.renderGenerator(body, s.slice(4));
+      else if (s.startsWith('gen:') && GENERATORS[s.slice(4)]) await this.renderGenerator(body, s.slice(4));
       else if (s.startsWith('tag:')) this.renderTag(body, idx, s.slice(4));
       else if (TYPES[s]) await this.renderCategory(body, idx, s);
       else await this.renderHome(body, idx);
@@ -5436,7 +5567,7 @@ class OverviewView extends ItemView {
     return sel;
   }
 
-  renderGenerator(body, kind) {
+  async renderGenerator(body, kind) {
     const p = this.plugin;
     const g = GENERATORS[kind];
     const st = this.genState(kind);
@@ -5449,6 +5580,14 @@ class OverviewView extends ItemView {
       e.createEl('strong', { text: 'Generators need the Randomness plugin.' });
       e.createDiv({ text: 'Install and enable Randomness, and keep your genre, character, conflict, plot and place .rdm files where it can find them (its Generator root). Loresmith rolls those tables.' });
       return;
+    }
+
+    const missing = await p.genMissingTables();
+    if (missing.length) {
+      const warn = box.createDiv('ls-gen-missing');
+      warn.createEl('strong', { text: `${missing.length} generator table${missing.length === 1 ? ' is' : 's are'} missing.` });
+      warn.createDiv({ text: `Loresmith's tables aren't where Randomness can find them (for example "${missing[0]}"). Install them, or check Randomness's Generator root.` });
+      textBtn(warn, 'Install generator tables', async () => { await p.installGeneratorTables(); this.render(); }, 'mod-cta');
     }
 
     const ctl = box.createDiv('ls-gen-controls');
@@ -11451,6 +11590,21 @@ class LoresmithSettingTab extends PluginSettingTab {
         await p.openCalendarNote();
         this.display();
       }));
+
+    new Setting(containerEl).setName('Generators').setHeading();
+    const genFolder = this.plugin.genInstallFolder();
+    const genSet = new Setting(containerEl)
+      .setName('Generator tables')
+      .setDesc(`The genre, character, conflict, plot and place lists the Generators roll, downloaded from GitHub for this version of Loresmith into "${genFolder}", where the Randomness plugin reads them. Files you've edited are never overwritten: the new version is saved beside them as a .txt to copy from.`)
+      .addButton((b) => b.setButtonText('Install or update').setCta().onClick(async () => {
+        b.setDisabled(true);
+        await this.plugin.installGeneratorTables();
+        this.display();
+      }));
+    if (!this.plugin.randomness()) genSet.descEl.createDiv({ cls: 'mod-warning', text: 'Needs the Randomness plugin, which is not enabled.' });
+    else void this.plugin.genMissingTables().then((m) => {
+      genSet.descEl.createDiv({ cls: m.length ? 'mod-warning' : '', text: m.length ? `${m.length} tables missing.` : 'All tables found ✓' });
+    });
 
     new Setting(containerEl).setName('Manuscript and ebook').setHeading();
     const ms = this.plugin.settings.manuscript;

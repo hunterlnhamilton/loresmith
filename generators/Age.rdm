@@ -1,0 +1,10 @@
+// This is a Randomness generator file — plain text.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+
+Table: Age
+Young Adult
+New Adult
+Adult
+
+// Roll it from any note with `rdm:[@Age]`

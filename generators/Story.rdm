@@ -1,0 +1,39 @@
+// Randomness generator file — story-level tables that fit any genre.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll from any note with `rdm:[@Theme]` or `rdm:[@Emotional Tone]`
+Title: Story Basics
+
+Table: Theme
+Love conquers all
+The cost of ambition
+Power corrupts
+Identity and belonging
+Redemption
+Grief and letting go
+Sacrifice for the greater good
+Freedom vs. security
+Found family
+Truth vs. comfortable lies
+The past haunts the present
+Coming of age
+Revenge and its cost
+Hope in the dark
+Nature vs. humanity
+Faith and doubt
+
+Table: Emotional Tone
+Hopeful
+Bittersweet
+Dark and brooding
+Whimsical
+Tense and paranoid
+Melancholic
+Playful
+Romantic and yearning
+Gritty
+Eerie
+Triumphant
+Cozy
+Tragic
+Wry and witty

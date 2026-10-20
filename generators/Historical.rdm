@@ -1,0 +1,170 @@
+// Randomness generator file — Historical & Western subgenres.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll it from any note with `rdm:[@Historical]`
+Title: Historical Genres
+Use: Conflicts.rdm
+
+Table: Historical
+[@Historical Mode] — [@Historical Era]
+
+Table: Historical Mode
+Hidden:
+Literary Historical
+Historical Adventure
+Historical Mystery
+Historical Romance
+Biographical Fiction
+Alternate History
+Saga / Multi-Generational
+War Fiction
+
+Table: Historical Era
+Hidden:
+[@Historical Ancient]
+[@Historical Medieval]
+[@Historical Early Modern]
+[@Historical Modern]
+[@Historical Western]
+
+Table: Historical Ancient
+Hidden:
+Ancient Egypt
+Classical Greece
+Roman Empire
+Bronze Age
+Ancient China
+
+Table: Historical Medieval
+Hidden:
+Viking Age
+Medieval Europe
+Crusades
+Heian Japan
+Islamic Golden Age
+
+Table: Historical Early Modern
+Hidden:
+Renaissance
+Tudor / Elizabethan
+Age of Sail / Piracy
+Edo Japan
+Napoleonic
+
+Table: Historical Modern
+Hidden:
+Victorian
+Gilded Age
+World War I
+Jazz Age
+World War II
+Cold War
+
+Table: Historical Western
+Hidden:
+Classic Western
+Revisionist Western
+Weird Western
+Frontier Saga
+Gold Rush
+Space Western
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Historical Plot Tropes
+Rags to Riches
+Forbidden Love Across Class
+War Tears Them Apart
+The Family Secret
+Fight for Survival
+Rise to Power
+A Spy at Court
+The Long Voyage
+The Revolution
+Hidden Identity
+The Rebel Cause
+A Fortune Lost
+
+Table: Historical Character Tropes
+Ambitious Courtier
+Battle-Weary Soldier
+Spirited Heroine Defying Convention
+Disgraced Noble
+Revolutionary Idealist
+Loyal Servant
+Frontier Outlaw
+Scholar Ahead of Their Time
+Merchant on the Rise
+Widowed Matriarch
+
+Table: Historical Locations
+a royal court rife with intrigue
+a besieged city
+a frontier town
+a tall ship on a long voyage
+a remote monastery
+a bustling port
+a country estate
+the edge of a battlefield
+a teeming industrial city
+a trading post on the edge of empire
+
+Table: Historical Conflicts
+a war reaches their doorstep
+a revolution threatens their family
+an inheritance is contested
+a plague sweeps the city
+they must hide their true identity
+a crown is up for grabs
+an expedition goes wrong
+a scandal threatens ruin
+
+// ---- Audience variants: used by the Story Seed template ----
+// MG = Middle Grade. Young Adult and Adult seeds use the tables above.
+
+Table: Historical MG
+[@Historical Mode MG] — [@Historical Era]
+
+Table: Historical Mode MG
+Hidden:
+Literary Historical
+Historical Adventure
+Historical Mystery
+Biographical Fiction
+Alternate History
+Saga / Multi-Generational
+War Fiction
+
+Table: Historical Plot Tropes MG
+Hidden:
+Rags to Riches
+Friendship Across Class
+War Tears Them Apart
+The Family Secret
+Fight for Survival
+A Spy at Court
+The Long Voyage
+The Revolution
+Hidden Identity
+The Rebel Cause
+A Fortune Lost
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Historical conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Historical Conflict Mix
+1: [@Historical Conflicts]
+1: [@Conflicts]
+
+Table: Historical Conflict Mix YA
+Hidden:
+1: [@Historical Conflicts]
+1: [@Conflicts YA]
+
+Table: Historical Conflict Mix MG
+Hidden:
+1: [@Historical Conflicts]
+1: [@Conflicts MG]

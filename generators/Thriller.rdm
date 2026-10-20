@@ -1,0 +1,231 @@
+// Randomness generator file — Thriller subgenres.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll it from any note with `rdm:[@Thriller]`
+Title: Thriller Genres
+Use: Conflicts.rdm
+
+Table: Thriller
+[@Thriller Pace] [@Thriller Stakes]
+
+Table: Thriller Pace
+Hidden:
+Slow-Burn
+Psychological
+Action
+Suspense
+Domestic
+
+Table: Thriller Stakes
+Hidden:
+[@Thriller Personal]
+[@Thriller Institutional]
+[@Thriller Global]
+[@Thriller Crossover]
+
+Table: Thriller Personal
+Hidden:
+Domestic Thriller
+Psychological Thriller
+Stalker Thriller
+Survival Thriller
+Revenge Thriller
+
+Table: Thriller Institutional
+Hidden:
+Legal Thriller
+Medical Thriller
+Corporate Thriller
+Dark Academia Thriller
+Journalism Thriller
+
+Table: Thriller Global
+Hidden:
+Spy / Espionage
+Political Thriller
+Conspiracy Thriller
+Military Thriller
+Techno-Thriller
+Eco-Thriller
+
+Table: Thriller Crossover
+Hidden:
+Romantic Suspense
+Supernatural Thriller
+Sci-Fi Thriller
+Historical Thriller
+Heist Thriller
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Thriller Plot Tropes
+Ticking Clock
+The Mole Inside
+On the Run
+The Conspiracy Goes All the Way Up
+Wrong Place, Wrong Time
+Double Cross
+The Missing Person
+Gaslighting Spouse
+Hostage Situation
+The Leak
+One Last Job
+The Perfect Stranger
+
+Table: Thriller Character Tropes
+Ex-Special Forces Loner
+Whistleblower
+Rookie Agent
+Mastermind Villain
+The Handler
+Unreliable Narrator
+Ordinary Person in Over Their Head
+The Hacker
+Corrupt Official
+Assassin With a Code
+
+Table: Thriller Locations
+a European capital during a summit
+a remote research facility
+a high-rise under lockdown
+a quiet suburb with secrets
+a government black site
+a cross-country highway
+a hospital on the night shift
+an embassy under siege
+a private island
+a courtroom during a high-profile trial
+
+Table: Thriller Conflicts
+a bomb must be found within hours
+a spouse disappears without a trace
+a stolen file could topple a government
+a pandemic is being covered up
+an innocent is framed for an assassination
+a stalker is escalating
+a rogue agent goes dark
+a corporation silences anyone who talks
+
+// ---- Audience variants: used by the Story Seed template ----
+// MG = Middle Grade, YA = Young Adult. Adult seeds use the tables above.
+
+Table: Thriller MG
+[@Thriller Pace MG] [@Thriller Stakes MG]
+
+Table: Thriller Pace MG
+Hidden:
+Action
+Suspense
+
+Table: Thriller Stakes MG
+Hidden:
+Survival Thriller
+Spy / Espionage
+Heist Thriller
+Conspiracy Thriller
+Supernatural Thriller
+Sci-Fi Thriller
+
+Table: Thriller Plot Tropes MG
+Hidden:
+Ticking Clock
+The Mole Inside
+On the Run
+Wrong Place, Wrong Time
+Double Cross
+The Missing Person
+The Leak
+The Secret Mission
+The Stolen Plans
+Trapped With No Way Out
+
+Table: Thriller Character Tropes MG
+Hidden:
+Rookie Agent
+Mastermind Villain
+The Handler
+Ordinary Kid in Over Their Head
+The Hacker
+Corrupt Official
+Gadget Genius
+Former Spy Grandparent
+
+Table: Thriller Conflicts MG
+Hidden:
+a device must be stopped within hours
+a parent goes missing on a work trip
+stolen plans could put a city in danger
+a storm traps them with a dangerous stranger
+someone is framed for a theft they didn't commit
+a secret agency recruits the wrong kid
+a rogue agent goes dark
+a company is hiding what's in the factory
+
+Table: Thriller YA
+[@Thriller Pace YA] [@Thriller Stakes YA]
+
+Table: Thriller Pace YA
+Hidden:
+Slow-Burn
+Psychological
+Action
+Suspense
+
+Table: Thriller Stakes YA
+Hidden:
+[@Thriller Personal YA]
+[@Thriller Institutional]
+[@Thriller Global]
+[@Thriller Crossover]
+
+Table: Thriller Personal YA
+Hidden:
+Psychological Thriller
+Stalker Thriller
+Survival Thriller
+Revenge Thriller
+
+Table: Thriller Plot Tropes YA
+Hidden:
+Ticking Clock
+The Mole Inside
+On the Run
+The Conspiracy Goes All the Way Up
+Wrong Place, Wrong Time
+Double Cross
+The Missing Person
+Hostage Situation
+The Leak
+One Last Job
+The Perfect Stranger
+
+Table: Thriller Conflicts YA
+Hidden:
+a bomb must be found within hours
+a best friend disappears without a trace
+a stolen file could topple a government
+a pandemic is being covered up
+an innocent is framed for an assassination
+a stalker is escalating
+a rogue agent goes dark
+a corporation silences anyone who talks
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Thriller conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Thriller Conflict Mix
+1: [@Thriller Conflicts]
+1: [@Conflicts]
+
+Table: Thriller Conflict Mix YA
+Hidden:
+1: [@Thriller Conflicts YA]
+1: [@Conflicts YA]
+
+Table: Thriller Conflict Mix MG
+Hidden:
+1: [@Thriller Conflicts MG]
+1: [@Conflicts MG]

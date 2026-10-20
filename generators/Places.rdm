@@ -1,0 +1,81 @@
+// Randomness generator file — details for places, in any genre.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Loresmith's Place generator rolls each table here by name, along with
+// Setting (Setting.rdm) for the kind of place and the genre's Locations.
+// Roll from any note with `rdm:[@Place Sketch]`
+Title: Places
+Use: Setting.rdm
+
+Table: Place Sketch
+[@Setting]: [@Place Atmosphere]. You notice [@Place Feature]. Trouble brewing: [@Place Trouble].
+
+Table: Place Atmosphere
+hushed and watchful
+cheerful, but hiding something
+crowded, loud and smoky
+abandoned and echoing
+cosy and lamp-lit
+tense, like a storm is coming
+sacred and still
+grand, but decaying
+bright, sterile and too clean
+wild and overgrown
+damp and cramped
+festive, with an edge
+
+Table: Place Feature
+a door no one remembers locking
+a statue that faces a different way each morning
+a bell that rings on its own
+an enormous old tree at its heart
+a wall covered in names
+a well that never runs dry
+a staircase that goes nowhere
+a mural with one figure scratched out
+a garden that blooms out of season
+a sealed room
+a view over the whole city
+a clock stopped at the same hour
+
+Table: Place Inhabitants
+a suspicious caretaker
+regulars who know everyone's business
+a family who has lived here for generations
+travellers passing through
+a gang of local kids
+a reclusive owner
+workers on strike
+pilgrims
+an eccentric collector
+people who fled somewhere worse
+scholars arguing
+no one, except at night
+
+Table: Place Secret
+a hidden passage beneath the floor
+it was built on top of something older
+a missing person was last seen here
+someone is watching it
+the owner is not who they claim to be
+it changes when no one is looking
+a fortune is hidden in the walls
+a pact was signed here
+something is buried in the grounds
+a forgotten disaster happened here
+a second entrance only locals know
+letters left behind tell a different story
+
+Table: Place Trouble
+it's about to be torn down
+two groups both claim it
+supplies are running out
+a stranger is asking questions
+something valuable has gone missing
+a storm is about to cut it off
+rent is due and no one can pay
+a rival has moved in next door
+there are strange noises at night
+an inspection could shut it down
+an old feud is boiling over
+there's a celebration everyone dreads

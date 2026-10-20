@@ -1,0 +1,21 @@
+{
+  "about": "Generator tables for Loresmith's Generators. The plugin's \"Install generator tables\" downloads every file listed here into the vault, where the Randomness plugin reads them.",
+  "files": [
+    "Age.rdm",
+    "Characters.rdm",
+    "Conflicts.rdm",
+    "Dynamics.rdm",
+    "Fantasy.rdm",
+    "Genres.rdm",
+    "Historical.rdm",
+    "Horror.rdm",
+    "Mystery.rdm",
+    "Places.rdm",
+    "Plot.rdm",
+    "Romance.rdm",
+    "Science Fiction.rdm",
+    "Setting.rdm",
+    "Story.rdm",
+    "Thriller.rdm"
+  ]
+}

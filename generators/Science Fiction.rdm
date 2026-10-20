@@ -1,0 +1,169 @@
+// Randomness generator file — Science Fiction subgenres.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll it from any note with `rdm:[@Science Fiction]`
+Title: Science Fiction Genres
+Use: Conflicts.rdm
+
+Table: Science Fiction
+[@SF Scale] [@SF Flavor]
+
+Table: SF Scale
+Hidden:
+Hard SF
+Soft SF
+Space Opera
+Near-Future
+Far-Future
+Cozy / Slice of Life SF
+
+Table: SF Flavor
+Hidden:
+[@SF Punk]
+[@SF Dark]
+[@SF Adventure]
+[@SF Speculative]
+[@SF Crossover]
+
+Table: SF Punk
+Hidden:
+Cyberpunk
+Post-Cyberpunk
+Biopunk
+Solarpunk
+Nanopunk
+Lunarpunk
+
+Table: SF Dark
+Hidden:
+Dystopian
+Post-Apocalyptic
+Apocalyptic
+Dying Earth
+Sci-Fi Horror
+Climate Fiction
+
+Table: SF Adventure
+Hidden:
+Military SF
+Space Western
+Planetary Romance
+Lost World
+First Contact
+Generation Ship
+
+Table: SF Speculative
+Hidden:
+Time Travel
+Alternate History
+Alien Invasion
+AI / Robot Fiction
+Mundane SF
+Social SF
+
+Table: SF Crossover
+Hidden:
+Science Fantasy
+LitRPG
+Tech Noir
+SF Romance
+Comedic SF
+Mecha
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Science Fiction Plot Tropes
+First Contact Gone Wrong
+Rogue AI
+Lost Colony
+The Corporation Is the Villain
+Time Loop
+Generation Ship Mutiny
+Uplifted Species
+Clones and Identity
+The Signal From Deep Space
+Terraforming Gone Wrong
+Mind Upload
+Fugitive Across the Stars
+
+Table: Science Fiction Character Tropes
+Grizzled Captain
+Hotshot Pilot
+Brilliant Scientist
+Android Seeking Humanity
+Corporate Whistleblower
+Space Smuggler
+Last of Their Kind
+Augmented Super-Soldier
+Hacker From the Undercity
+Alien Ambassador
+
+Table: Science Fiction Locations
+a neon megacity
+an orbital station on the edge of collapse
+a generation ship centuries into its voyage
+a mining colony on a hostile moon
+a half-terraformed Mars
+a derelict alien megastructure
+a flooded post-climate coastline
+a corporate arcology
+a frontier world beyond the law
+a research outpost in deep space
+
+Table: Science Fiction Conflicts
+an AI declares its independence
+a colony fights to break from Earth
+first contact threatens war
+a megacorp controls the water supply
+the ship's systems are failing
+a deadly signal spreads through the net
+a time anomaly is unravelling history
+clones demand their rights
+
+// ---- Audience variants: used by the Story Seed template ----
+// MG = Middle Grade. Young Adult and Adult seeds use the tables above.
+
+Table: Science Fiction MG
+[@SF Scale] [@SF Flavor MG]
+
+Table: SF Flavor MG
+Hidden:
+[@SF Punk]
+[@SF Dark MG]
+[@SF Adventure]
+[@SF Speculative]
+[@SF Crossover MG]
+
+Table: SF Dark MG
+Hidden:
+Dystopian
+Post-Apocalyptic
+Dying Earth
+Climate Fiction
+
+Table: SF Crossover MG
+Hidden:
+Science Fantasy
+LitRPG
+Comedic SF
+Mecha
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Science Fiction conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Science Fiction Conflict Mix
+1: [@Science Fiction Conflicts]
+1: [@Conflicts]
+
+Table: Science Fiction Conflict Mix YA
+Hidden:
+1: [@Science Fiction Conflicts]
+1: [@Conflicts YA]
+
+Table: Science Fiction Conflict Mix MG
+Hidden:
+1: [@Science Fiction Conflicts]
+1: [@Conflicts MG]

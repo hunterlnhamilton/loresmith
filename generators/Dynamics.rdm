@@ -1,0 +1,66 @@
+// Randomness generator file — how two characters relate.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll from any note with `rdm:[@Relationship Type]`, `rdm:[@Subplot Trope]`
+// or `rdm:[@Friction Point]`
+Title: Character Dynamics
+
+Table: Dynamic
+[@Relationship Type] — [@Subplot Trope], strained by [@Friction Point >> lower]
+
+// Romance is weighted to come up most often; change the 3 to adjust.
+Table: Relationship Type
+3: Romantic interests
+Rivals
+Mentor and student
+Siblings
+Best friends
+Reluctant allies
+Former lovers
+Hunter and hunted
+Partners in crime
+Parent and child
+Strangers bound by fate
+Sworn enemies
+
+// Middle Grade version: no romance. Used by the Story Seed template.
+Table: Relationship Type MG
+Hidden:
+3: Best friends
+Rivals
+Mentor and student
+Siblings
+Reluctant allies
+Cousins
+Partners in crime
+Strangers bound by fate
+Former friends
+New kid and old-timer
+
+Table: Subplot Trope
+a secret kept from the other
+a debt owed between them
+forced to share quarters
+one saves the other's life
+a shared enemy
+a competition between them
+a misunderstanding that festers
+a promise made long ago
+one is hiding their true identity
+a third party drives a wedge
+opposite sides of a cause
+a bet or wager
+
+Table: Friction Point
+Different moral codes
+A class divide
+One wants to stay, the other to leave
+Trust issues
+Clashing ambitions
+Opposing loyalties
+A past betrayal
+Secrecy vs. honesty
+Duty vs. desire
+Pride
+Different ways of grieving
+Control vs. freedom

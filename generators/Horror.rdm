@@ -1,0 +1,210 @@
+// Randomness generator file — Horror subgenres.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll it from any note with `rdm:[@Horror]`
+Title: Horror Genres
+Use: Conflicts.rdm
+
+Table: Horror
+[@Horror Intensity] [@Horror Source]
+
+Table: Horror Intensity
+Hidden:
+Quiet Horror
+Psychological Horror
+Gothic
+Literary Horror
+Cozy Horror
+Splatterpunk
+Extreme Horror
+
+Table: Horror Source
+Hidden:
+[@Horror Supernatural]
+[@Horror Monster]
+[@Horror Human]
+[@Horror Cosmic]
+[@Horror Setting]
+
+Table: Horror Supernatural
+Hidden:
+Ghost Story
+Haunted House
+Possession
+Occult Horror
+Folk Horror
+Witchcraft
+
+Table: Horror Monster
+Hidden:
+Creature Feature
+Vampire
+Werewolf
+Zombie
+Kaiju
+Cryptid
+
+Table: Horror Human
+Hidden:
+Slasher
+Survival Horror
+Body Horror
+Home Invasion
+Cult Horror
+Medical Horror
+
+Table: Horror Cosmic
+Hidden:
+Cosmic / Lovecraftian Horror
+Weird Fiction
+New Weird
+Eco-Horror
+Analog Horror
+Liminal Horror
+
+Table: Horror Setting
+Hidden:
+Southern Gothic
+Small-Town Horror
+Isolation Horror
+Sci-Fi Horror
+Historical Horror
+Comedic Horror
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Horror Plot Tropes
+The House Wants Them
+Something Followed Them Home
+The Town's Dark Secret
+Don't Go in the Basement
+The Curse Passes On
+Trapped With It
+The Ritual Gone Wrong
+Nobody Believes Them
+The Thing in the Woods
+It Was Never Dead
+The Inheritance
+A Loved One Possessed
+
+Table: Horror Character Tropes
+Final Girl
+The Skeptic
+The Occult Expert
+Doomed Comic Relief
+The Creepy Child
+The Local Who Knows
+The Grieving Parent
+The Cult Leader
+The Paranormal Investigator
+The One Who Already Saw It
+
+Table: Horror Locations
+an isolated farmhouse
+a decaying Victorian mansion
+a small town during its yearly festival
+an abandoned asylum
+a research station in Antarctica
+a summer camp after closing
+a cabin deep in the woods
+a night train with no stops
+a ship lost at sea
+a perfect suburban cul-de-sac
+
+Table: Horror Conflicts
+an entity claims a family member
+a curse demands a new victim every year
+the town covers up disappearances
+a creature hunts them through one long night
+a ritual must be completed or reversed
+the dead won't stay buried
+something is wearing a loved one's face
+an outbreak spreads through the community
+
+// ---- Audience variants: used by the Story Seed template ----
+// MG = Middle Grade, YA = Young Adult. Adult seeds use the tables above.
+
+Table: Horror MG
+[@Horror Intensity MG] [@Horror Source MG]
+
+Table: Horror Intensity MG
+Hidden:
+Quiet Horror
+Gothic
+Cozy Horror
+Spooky Adventure
+
+Table: Horror Source MG
+Hidden:
+[@Horror Supernatural MG]
+[@Horror Monster]
+[@Horror Setting MG]
+
+Table: Horror Supernatural MG
+Hidden:
+Ghost Story
+Haunted House
+Folk Horror
+Witchcraft
+
+Table: Horror Setting MG
+Hidden:
+Small-Town Horror
+Isolation Horror
+Sci-Fi Horror
+Historical Horror
+Comedic Horror
+
+Table: Horror Character Tropes MG
+Hidden:
+The Skeptic
+The Occult Expert
+The Creepy Child
+The Local Who Knows
+The Paranormal Investigator
+The One Who Already Saw It
+The Kid Nobody Believes
+The Brave Little Sibling
+
+Table: Horror Conflicts MG
+Hidden:
+a ghost won't let the family leave
+the town hides what happened years ago
+a creature prowls the woods every full moon
+a spell must be broken before midnight
+something is living in the walls
+a friend is acting strangely and nobody notices
+an old toy keeps coming back
+the shortcut home leads somewhere else
+
+Table: Horror YA
+[@Horror Intensity YA] [@Horror Source]
+
+// Same as the adult list, minus Splatterpunk and Extreme Horror.
+Table: Horror Intensity YA
+Hidden:
+Quiet Horror
+Psychological Horror
+Gothic
+Literary Horror
+Cozy Horror
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Horror conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Horror Conflict Mix
+1: [@Horror Conflicts]
+1: [@Conflicts]
+
+Table: Horror Conflict Mix YA
+Hidden:
+1: [@Horror Conflicts]
+1: [@Conflicts YA]
+
+Table: Horror Conflict Mix MG
+Hidden:
+1: [@Horror Conflicts MG]
+1: [@Conflicts MG]

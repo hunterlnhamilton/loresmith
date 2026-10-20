@@ -1,0 +1,212 @@
+// Randomness generator file — Romance subgenres, with a trope.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Roll it from any note with `rdm:[@Romance]`
+Title: Romance Genres
+Use: Conflicts.rdm
+
+Table: Romance
+[@Romance Heat] [@Romance Subgenre] — [@Romance Trope]
+
+Table: Romance Heat
+Hidden:
+Sweet / Clean
+Closed Door
+Slow Burn
+Steamy
+Explicit
+
+Table: Romance Subgenre
+Hidden:
+[@Romance Contemporary]
+[@Romance Historical]
+[@Romance Speculative]
+
+Table: Romance Contemporary
+Hidden:
+Contemporary Romance
+Small-Town Romance
+Sports Romance
+Workplace Romance
+Rom-Com
+Romantic Suspense
+New Adult
+
+Table: Romance Historical
+Hidden:
+Regency Romance
+Victorian Romance
+Highland Romance
+Western Romance
+Medieval Romance
+Gilded Age Romance
+
+Table: Romance Speculative
+Hidden:
+Paranormal Romance
+Romantasy
+Sci-Fi Romance
+Time-Travel Romance
+Monster Romance
+Dark Romance
+
+Table: Romance Trope
+Hidden:
+Enemies to Lovers
+Friends to Lovers
+Fake Dating
+Forced Proximity
+Second Chance
+Grumpy / Sunshine
+Marriage of Convenience
+Forbidden Love
+Only One Bed
+Secret Identity
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Romance Plot Tropes
+Meet-Cute
+Fake Relationship Becomes Real
+Rivals Forced to Work Together
+Second Chance at First Love
+The Big Misunderstanding
+Snowed In Together
+The Bet
+Arranged Marriage
+Opposites Attract
+Secret Relationship
+The Grand Gesture
+Love Triangle
+
+Table: Romance Character Tropes
+Grumpy Loner
+Sunshine Optimist
+Brooding Hero
+Ice Queen / Ice King
+Single Parent
+Workaholic Who Forgot to Live
+Small-Town Sweetheart
+Billionaire With a Secret
+Best Friend's Sibling
+Runaway Bride / Groom
+
+Table: Romance Locations
+a small coastal town
+a bustling city bakery
+a ranch in Montana
+a Regency ballroom
+a ski resort
+a destination wedding
+a rival restaurant across the street
+a cozy bookshop
+a Scottish castle
+a summer music festival
+
+Table: Romance Conflicts
+they're competing for the same promotion
+one of them leaves town at summer's end
+their families are feuding
+a secret from the past resurfaces
+one of them is engaged to someone else
+a contract keeps them together
+their careers pull them to different cities
+one of them has sworn off love
+
+// ---- Audience variants: used by the Story Seed template ----
+// YA = Young Adult. Romance isn't offered for Middle Grade.
+// New Adult and Adult seeds use the tables above.
+
+Table: Romance YA
+[@Romance Heat YA] [@Romance Subgenre YA] — [@Romance Trope YA]
+
+Table: Romance Heat YA
+Hidden:
+Sweet / Clean
+Closed Door
+Slow Burn
+
+Table: Romance Subgenre YA
+Hidden:
+[@Romance Contemporary YA]
+[@Romance Historical]
+[@Romance Speculative YA]
+
+Table: Romance Contemporary YA
+Hidden:
+Contemporary Romance
+Small-Town Romance
+Sports Romance
+Rom-Com
+Romantic Suspense
+
+Table: Romance Speculative YA
+Hidden:
+Paranormal Romance
+Romantasy
+Sci-Fi Romance
+Time-Travel Romance
+
+Table: Romance Trope YA
+Hidden:
+Enemies to Lovers
+Friends to Lovers
+Fake Dating
+Forced Proximity
+Second Chance
+Grumpy / Sunshine
+Forbidden Love
+Secret Identity
+
+Table: Romance Plot Tropes YA
+Hidden:
+Meet-Cute
+Fake Relationship Becomes Real
+Rivals Forced to Work Together
+Second Chance at First Love
+The Big Misunderstanding
+Snowed In Together
+The Bet
+Opposites Attract
+Secret Relationship
+The Grand Gesture
+Love Triangle
+
+Table: Romance Character Tropes YA
+Hidden:
+Grumpy Loner
+Sunshine Optimist
+Brooding Mystery
+Ice Queen / Ice King
+Small-Town Sweetheart
+Best Friend's Sibling
+New Kid in Town
+Overachiever
+Bad Reputation, Good Heart
+Theatre Kid
+
+Table: Romance Conflicts YA
+Hidden:
+they're competing for the same scholarship
+one of them moves away at summer's end
+their families are feuding
+a secret from the past resurfaces
+one of them is dating someone else
+a school project keeps them together
+their dream colleges are across the country
+one of them has sworn off love
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Romance conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Romance Conflict Mix
+1: [@Romance Conflicts]
+1: [@Conflicts]
+
+Table: Romance Conflict Mix YA
+Hidden:
+1: [@Romance Conflicts YA]
+1: [@Conflicts YA]

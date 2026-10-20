@@ -1,0 +1,161 @@
+// Randomness generator file — Fantasy subgenres.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Helper tables are marked Hidden: so only "Fantasy" shows in the sidebar.
+// Roll it from any note with `rdm:[@Fantasy]`
+Title: Fantasy Genres
+Use: Conflicts.rdm
+
+Table: Fantasy
+[@Fantasy Scale] [@Fantasy Flavor]
+
+Table: Fantasy Scale
+Hidden:
+Epic
+Heroic
+Sword and Sorcery
+Cozy / Slice of Life
+Fantasy of Manners
+
+Table: Fantasy Flavor
+Hidden:
+[@Fantasy Dark]
+[@Fantasy Romance]
+[@Fantasy Alternate History]
+[@Fantasy Contemporary]
+[@Fantasy Misc]
+
+Table: Fantasy Dark
+Hidden:
+Dark Fantasy
+Grimdark Fantasy
+
+Table: Fantasy Romance
+Hidden:
+Romantasy
+Fantasy Romance
+Romantic Fantasy
+Paranormal Romance
+Chivalric Romance / Planetary Romance
+
+Table: Fantasy Alternate History
+Hidden:
+Historical Fantasy
+Flintlock Fantasy
+Steampunk / Gaslamp
+Dieselpunk / Atompunk
+Secondary World Contemporary
+
+Table: Fantasy Contemporary
+Hidden:
+Urban Fantasy
+Mythic Fantasy
+Mythpunk
+Magical Realism
+Portal Fantasy
+Isekai
+
+Table: Fantasy Misc
+Hidden:
+Military Fantasy
+Comedic Fantasy
+Xenofiction
+Anthrofiction
+Science Fantasy
+Progression Fantasy
+Cultivation Fantasy
+LitRPG
+
+// ---- Story kit: used by the Story Seed template ----
+
+Table: Fantasy Plot Tropes
+The Chosen One
+The Dark Lord Rises
+Quest for a Magical Artifact
+The Prophecy Misread
+Lost Heir to the Throne
+Magic Comes at a Price
+The Fellowship Fractures
+The Mentor Falls
+Ancient Evil Awakens
+The Kingdom Divided
+A Bargain With the Fae
+Forbidden Magic
+
+Table: Fantasy Character Tropes
+Reluctant Hero
+Wise Mentor
+Farm Kid With a Destiny
+Morally Grey Sorcerer
+Loyal Knight
+Trickster Thief
+Exiled Royal
+Wild Magic User
+Dragon-Bonded
+Cursed Wanderer
+
+Table: Fantasy Locations
+a crumbling elven city
+a war-torn border kingdom
+an academy of magic
+a cursed forest
+a floating sky-island
+a desert empire of caravans
+a frozen northern clanhold
+a port city of smugglers
+a labyrinthine underground realm
+a fae court hidden behind the veil
+
+Table: Fantasy Conflicts
+a usurper seizes the throne
+an ancient seal is breaking
+magic is dying out of the world
+two kingdoms edge toward war
+a god demands a sacrifice
+a plague of shadow spreads
+the true heir must be found before the coronation
+a rogue mage hunts the last dragons
+
+// ---- Audience variants: used by the Story Seed template ----
+// MG = Middle Grade, YA = Young Adult. Adult seeds use the tables above.
+
+Table: Fantasy MG
+[@Fantasy Scale] [@Fantasy Flavor MG]
+
+Table: Fantasy Flavor MG
+Hidden:
+[@Fantasy Alternate History]
+[@Fantasy Contemporary]
+[@Fantasy Misc]
+
+Table: Fantasy YA
+[@Fantasy Scale] [@Fantasy Flavor YA]
+
+// Same as the adult mix, minus Grimdark.
+Table: Fantasy Flavor YA
+Hidden:
+Dark Fantasy
+[@Fantasy Romance]
+[@Fantasy Alternate History]
+[@Fantasy Contemporary]
+[@Fantasy Misc]
+
+// ---- Central conflict: this genre's conflicts mixed with Conflicts.rdm ----
+// Used by the Story Seed template. Each line below is one "ticket":
+// half the time you get a Fantasy conflict, half the time one from the
+// shared list that fits any genre. Raise a number to favour that side,
+// e.g. 2: on the first line makes genre conflicts twice as likely.
+
+Table: Fantasy Conflict Mix
+1: [@Fantasy Conflicts]
+1: [@Conflicts]
+
+Table: Fantasy Conflict Mix YA
+Hidden:
+1: [@Fantasy Conflicts]
+1: [@Conflicts YA]
+
+Table: Fantasy Conflict Mix MG
+Hidden:
+1: [@Fantasy Conflicts]
+1: [@Conflicts MG]

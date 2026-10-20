@@ -1,0 +1,67 @@
+// Randomness generator file — plot beats that fit any genre.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Loresmith's Plot generator rolls each table here by name.
+// Roll from any note with `rdm:[@Plot Hook]`
+Title: Plot Beats
+
+Table: Plot Hook
+It starts when [@Plot Inciting Incident]. The twist: [@Plot Twist].
+
+Table: Plot Inciting Incident
+a stranger arrives with a warning
+a letter arrives that was never meant to be delivered
+someone dies under strange circumstances
+an inheritance comes with conditions
+an old promise comes due
+a long-lost relative reappears
+they witness something they shouldn't have
+their home is lost overnight
+a rule is broken in front of everyone
+a message arrives from someone presumed dead
+an invitation arrives to a place no one returns from
+a job offer is too good to refuse
+a secret is overheard
+the one person holding things together disappears
+
+Table: Plot Twist
+the mentor has been lying from the start
+the villain is trying to prevent something worse
+the prize was never real
+an ally has been working for the other side
+the protagonist caused the original disaster
+the person they're searching for doesn't want to be found
+the rules everyone believes in are wrong
+two enemies want the same thing for the same reason
+the trail leads back home
+the victim staged it
+far more time has passed than anyone realised
+the plan was meant for someone else
+
+Table: Plot Stakes
+their home will be lost
+someone they love will be taken from them
+the truth will be buried for good
+they'll become the thing they hate
+their community will be torn apart
+they'll lose their freedom
+their name will be ruined
+a family secret will come out
+the world as they know it will end
+they'll never get a second chance
+they'll lose their sense of who they are
+a promise to the dead will be broken
+
+Table: Plot Ending
+a hard-won victory that leaves a scar
+bittersweet: they win, but lose what mattered most
+triumphant
+tragic
+open-ended
+a quiet return home, changed
+the antagonist is redeemed
+the protagonist walks away from it all
+a final reveal that reframes everything
+a new beginning somewhere unexpected
+someone else pays the cost
+love wins, at a price

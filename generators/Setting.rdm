@@ -1,0 +1,112 @@
+// This is a Randomness generator file — plain text.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+
+Table: Setting
+Abandoned Mine
+Airplane
+Airport Check-in
+Alley
+Amusement Park
+Attic
+Bakery
+Bank
+Basement
+Bathroom (home)
+Barn
+Beach
+Bedrooms
+Birthday Party
+Bonfire
+Bowling Alley
+Bridge
+Bookstore
+Cafeteria
+Casino
+Catacombs
+Cave
+Church
+City Park
+Classroom
+Closet
+Coffee House
+Courtroom
+Cruise Ship
+Cryogenic Sleep Chamber
+Daycare
+Desert
+Diner
+Dragon’s Lair
+Dungeon (Caution Graphic Description)
+Egyptian Pyramids
+Elevator
+Farms
+Forest
+Frozen Tundra
+Gallows
+Garage
+Garage Sale
+Garden
+Graveyard
+Grocery Store
+Halloween Party
+Haunted House
+Herbalist Shop (fantasy)
+High School Hallway
+Hospital
+Hotel Room
+House Fire
+House Party
+Kitchen
+Laboratory
+Lake
+Library
+Locker Room
+Meadow
+Medieval Castle Armory
+Medieval Marketplace
+Middle School Dance (informal)
+Mindscape (Mind Magic)
+Mountains
+Movie Theatre
+Night Club
+Nursery
+Ocean/Sea Bed
+Old Pick-Up Truck
+Pirate Ship
+Playground
+Pond
+Pool Hall
+Prison Cell
+Pub
+Public Pool (Outdoor)
+Rainforest/Jungle
+Ranch
+Restaurant
+River
+School Bus
+School Office
+Shopping Mall
+Sleep-Away Camp
+Spaceport
+Spaceship
+Stands at a Sporting Event
+Storm Sewer
+Subway Station
+Swamp
+Taxi cab
+Teacher’s Lounge
+Toolshed
+Trailer
+Treehouse
+Tropical Island City
+Urban Street
+Video Arcade
+Waiting Room
+Waterfall
+Water Slide Park
+Wedding Ceremony (Church)
+Woods at Night
+Zoo
+
+// Roll it from any note with `rdm:[@Setting]`

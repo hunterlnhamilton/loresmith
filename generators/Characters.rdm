@@ -1,0 +1,871 @@
+// Randomness generator file — character profile tables, genre-neutral.
+// Lines starting with // are comments.
+// The FIRST table is what rolls when the file is rolled.
+// Rolling the file gives a whole quick character sketch.
+Title: Characters
+
+Table: Character Sketch
+<b>[@Archetype]</b> — [@Occupation]<br>[@Physical]<br>Skilled at [@Talents]<br>[@Traits]<br>[@Character Core]
+
+Table: Archetype
+The Hero
+The Mentor
+The Rebel
+The Caregiver
+The Explorer
+The Lover
+The Jester
+The Sage
+The Ruler
+The Innocent
+The Creator
+The Magician
+The Everyperson
+The Outlaw
+The Trickster
+The Guardian
+
+// Broad roles that translate to any genre.
+Table: Occupation
+Actor
+Animal Rescue Worker
+Animal Trainer
+Antiques Dealer
+Architect
+Auto Mechanic
+Babysitter
+Barista
+Bartender
+Bouncer
+Bounty Hunter
+Business Tycoon
+Cashier
+Chef
+Clergy
+Conductor
+Coroner
+Corrections Officer
+Deep Sea Diver (Commercial)
+Diplomat
+Dog Groomer
+Driver (Car)
+E.R. Physician
+Emergency Dispatcher
+Escort
+Ethical Hacker
+Exotic Dancer
+Farmer
+Fundraiser
+Funeral Director
+Geologist
+General Contractor
+Ghostwriter
+Glassblower
+Home Health Aide
+Human Test Subject
+Interpreter
+Jeweler
+Landscape Designer
+Librarian
+Locksmith
+Makeup Artist
+Mail Carrier
+Massage Therapist
+Mechanical Engineer
+Midwife
+Model
+Nanny
+Nurse (RN)
+Outdoor Guide
+Paleontologist
+Paralegal
+Parole Officer
+Personal Assistant (to a Celebrity)
+Personal Trainer
+Pest Control Technician
+Physical Therapist
+Pilot
+Police Officer
+Professional Athlete
+Radio DJ
+Rancher
+Real Estate Agent
+Recruiter
+Referee
+Server (Waiter or Waitress)
+Skydiving Instructor
+Small Business Owner
+Tattoo Artist
+Taxidermist
+Teacher
+Therapist (Mental Health)
+Tour Guide
+Treasure Hunter
+Veterinarian
+Wedding Planner
+Yoga Instructor
+
+
+// ---- Physical characteristics ----
+
+Table: Physical
+[@Char Build] build, [@Char Feature], [@Char Style]
+
+Table: Char Build
+Hidden:
+Tall and lanky
+Short and stocky
+Athletic
+Willowy
+Broad-shouldered
+Soft and round
+Wiry
+Unremarkable
+
+Table: Char Feature
+Hidden:
+a scar through one eyebrow
+mismatched eyes
+freckles everywhere
+prematurely grey hair
+a crooked smile
+a prosthetic limb
+tattoos down one arm
+a voice that carries
+a slight limp
+unnervingly piercing eyes
+burn scars on both hands
+a shaved head
+
+Table: Char Style
+Hidden:
+always impeccably dressed
+dressed in practical layers
+never without a long coat
+wears a family heirloom
+dresses to blend in
+colourful and mismatched
+in faded hand-me-downs
+sharp and severe
+
+// ---- Talents & skills: two different ones ----
+
+Table: Talents
+[!2 Char Talent >> implode \_and\_]
+
+Table: Char Talent
+Hidden:
+A Knack for Languages
+A Knack for Making Money
+A Way with Animals
+Archery
+Astral Projection
+Astrological Divination
+Baking
+Basic First Aid
+Being a Good Listener
+Blending In
+Carpentry
+Charm
+ESP (Clairvoyance)
+Empathy
+Enhanced Hearing
+Enhanced Sense of Smell
+Enhanced Palate
+Farming
+Fishing
+Foraging
+Gaining People’s Trust
+Gaming
+Gardening
+Haggling
+Herbalism
+Hospitality
+Hot-Wiring a Car
+High Pain Tolerance
+Knife Throwing
+Knowledge of Explosives
+Lip-Reading
+Lying
+Making People Laugh
+Mechanically Inclined
+Mentalism
+Mimicking
+Multitasking
+Musicality
+Organization
+Parkour
+Photographic Memory
+Predicting the Weather
+Promotion
+Psychokinesis
+Reading People
+Regeneration
+Repurposing
+Sculpting
+Self-Defense
+Sewing
+Sharpshooting
+Sleight of Hand
+Strategic Thinking
+Strong Breath Control
+Super Strength
+Survival Skills
+Swift-Footedness
+Talking with the Dead
+Throwing One’s Voice
+Whittling
+Wilderness Navigation
+Wrestling
+
+
+// ---- Traits: two virtues and a flaw ----
+
+Table: Traits
+[!2 Char Virtue >> implode \_and\_], but [@Char Flaw]
+
+Table: Char Virtue
+Hidden:
+Affectionate
+Ambitious
+Brave
+Calm
+Cautious
+Charismatic
+Clever
+Courageous
+Creative
+Curious
+Determined
+Diplomatic
+Friendly
+Funny
+Generous
+Honest
+Independent
+Intelligent
+Just
+Kind
+Loyal
+Mature
+Modest
+Optimistic
+Persistent
+Proper
+Responsible
+Serious
+Talented
+Thoughtful
+Thrifty
+Visionary
+Wise
+Witty
+
+Table: Char Flaw
+Hidden:
+Bossy
+Conceited
+Critical
+Dishonest
+Disorganized
+Impulsive
+Manipulative
+Prejudiced
+Reckless
+Stingy
+Stubborn
+Worry Wart
+
+// ---- Inner life ----
+// Wound, fear, motivation and the inner-conflict sentence roll together,
+// so the sentence always repeats what was rolled. The three lists are
+// independent, so they can be any length.
+
+Table: Character Core
+Set: wound=[@CharWound]
+Set: fear=[@CharFear]
+Set: motivation=[@CharMotivation]
+<b>Emotional Wound:</b> {$wound}<br><b>Fear:</b> {$fear}<br><b>Motivation:</b> {$motivation}<br><b>Inner Conflict:</b> Driven by {$motivation}, but afraid of {$fear}, because of {$wound}.
+
+Table: CharWound
+Hidden:
+Accidentally Killing Someone
+A Family Member’s Suicide
+A Home Invasion
+A House Fire
+A Parent’s Abandonment
+A Role Model Who Disappoints
+A Sibling’s Betrayal
+A Speech Impediment
+Becoming a Caregiver at an Early Age
+Being Bullied
+Being Fired or Laid Off
+Being Held Captive
+Being Mugged
+Being Publicly Humiliated
+Being Raised by Neglectful Parents
+Being Raised by Overprotective Parents
+Being So Beautiful It’s All People See
+Being the Victim of a Vicious Rumor
+Being Stalked
+Being Trapped in a Collapsed Building
+Being Unfairly Blamed For The Death of Another
+Childhood Sexual Abuse (by a family member or known person)
+Discovering One’s Parent is a Monster
+Discovering One’s Sibling Was Abused
+Experiencing a Miscarriage or Stillbirth
+Failing At School
+Failing To Do The Right Thing
+Financial Ruin Due To A Spouse’s Irresponsibility
+Finding Out One’s Child Was Abused
+Finding Out One Was Adopted
+Getting Lost In a Natural Environment
+Growing Up In A Cult
+Growing Up in a Dangerous Neighborhood
+Growing Up In Foster Care
+Growing Up In The Public Eye
+Growing Up In The Shadow of a Successful Sibling
+Growing Up with a Sibling Who Has a Chronic Disability or Illness
+Having Parents Who Favored One Child Over Another
+Having To Kill Another Person To Survive
+Infertility
+Infidelity (emotional or physical)
+Losing a Limb
+Losing a Loved One To A Random Act of Violence
+Making a Very Public Mistake
+Overly Critical or Strict Parents
+Physical Disfigurement
+Rejection By One’s Peers
+Telling The Truth But Not Being Believed
+The Death of a Child On One’s Watch
+Victimization via Identity Theft
+Watching A Loved One Die
+Wrongful Imprisonment
+Spending Time In Jail
+Suffering From a Learning Disability
+
+Table: CharFear
+Hidden:
+A Loved One Dying
+A Secret Being Revealed
+Abandonment
+Agoraphobia
+Becoming a Parent
+Becoming What One Hates
+Being Capable of Harm
+Being a Burden to Others
+Being Labeled
+Being Pitied
+Being Physically Touched
+Being Returned to an Abusive Environment
+Being Taken Advantage Of
+Being Watched
+Certain Kinds of People
+Change
+Conditional Love
+Conflict
+Criticism
+Crowds
+Death
+Discrimination
+Failure
+Feeling Unsafe
+Government
+Growing Old
+Having No Purpose
+Hope
+Humiliation
+Infidelity
+Isolation
+Leading
+Leaving Behind No Legacy
+Letting Others Down
+Losing Autonomy
+Losing Control
+Losing Financial Security
+Losing One’s Heritage or Cultural Identity
+Losing the Respect of Others
+Love
+Mediocrity
+Never Finding Happiness
+Not Being Believed
+Not Fitting In
+One’s Genetics
+Physical Pain
+Putting Yourself Out There
+Rejection
+Relational Commitment
+Responsibility for Others
+Sex
+Sickness
+
+Table: CharMotivation
+Hidden:
+Achieving Spiritual Enlightenment
+Avoiding Financial Ruin
+Beating an Illness or Diagnosis
+Being Appreciated by Family
+Being a Leader
+Being the Best at Something
+Caring for an Aging Parent
+Carrying on a Legacy
+Catching the Bad Guy or Girl
+Dealing with a Mental Condition
+Discovering One’s True Self
+Entering & Winning a Competition
+Escaping a Dangerous, Unwanted Life
+Escaping a Killer
+Escaping a Widespread Disaster
+Escaping Certain Death
+Escaping Confinement
+Escaping Homelessness
+Escaping Invaders
+Finding Friendship
+Finding a Lifelong Partner
+Gaining Fulfillment by Giving Back
+Having a Child
+Helping a Loved One Who’s Hurting Themselves
+Obtaining Shelter from the Elements
+Overcoming Abuse & Learning to Trust
+Overcoming Addiction
+Protecting One’s Home or Property
+Pursuing Justice
+Realizing a Dream
+Reconciling with an Estranged Family Member
+Rescuing a Loved One from a Captor
+Restoring a Name or Reputation
+Righting a Deep Wrong
+Seeking One’s Biological Roots
+Stopping an Event from Happening
+Trying Again Despite a Past Failure
+
+// ---- Audience versions: used by Loresmith's generators ----
+// MG = Middle Grade, YA = Young Adult. Each is the list above minus what
+// doesn't suit that audience. When you add a line above, add it to the
+// versions it suits too. Adult characters use the full lists.
+
+Table: Occupation YA
+Hidden:
+Actor
+Animal Rescue Worker
+Animal Trainer
+Antiques Dealer
+Architect
+Auto Mechanic
+Babysitter
+Barista
+Bartender
+Bouncer
+Bounty Hunter
+Business Tycoon
+Cashier
+Chef
+Clergy
+Conductor
+Coroner
+Corrections Officer
+Deep Sea Diver (Commercial)
+Diplomat
+Dog Groomer
+Driver (Car)
+E.R. Physician
+Emergency Dispatcher
+Ethical Hacker
+Farmer
+Fundraiser
+Funeral Director
+Geologist
+General Contractor
+Ghostwriter
+Glassblower
+Home Health Aide
+Human Test Subject
+Interpreter
+Jeweler
+Landscape Designer
+Librarian
+Locksmith
+Makeup Artist
+Mail Carrier
+Massage Therapist
+Mechanical Engineer
+Midwife
+Model
+Nanny
+Nurse (RN)
+Outdoor Guide
+Paleontologist
+Paralegal
+Parole Officer
+Personal Assistant (to a Celebrity)
+Personal Trainer
+Pest Control Technician
+Physical Therapist
+Pilot
+Police Officer
+Professional Athlete
+Radio DJ
+Rancher
+Real Estate Agent
+Recruiter
+Referee
+Server (Waiter or Waitress)
+Skydiving Instructor
+Small Business Owner
+Tattoo Artist
+Taxidermist
+Teacher
+Therapist (Mental Health)
+Tour Guide
+Treasure Hunter
+Veterinarian
+Wedding Planner
+Yoga Instructor
+
+Table: Occupation MG
+Hidden:
+Actor
+Animal Rescue Worker
+Animal Trainer
+Antiques Dealer
+Architect
+Auto Mechanic
+Babysitter
+Barista
+Bounty Hunter
+Business Tycoon
+Cashier
+Chef
+Clergy
+Conductor
+Coroner
+Corrections Officer
+Deep Sea Diver (Commercial)
+Diplomat
+Dog Groomer
+Driver (Car)
+E.R. Physician
+Emergency Dispatcher
+Ethical Hacker
+Farmer
+Fundraiser
+Funeral Director
+Geologist
+General Contractor
+Ghostwriter
+Glassblower
+Home Health Aide
+Interpreter
+Jeweler
+Landscape Designer
+Librarian
+Locksmith
+Makeup Artist
+Mail Carrier
+Massage Therapist
+Mechanical Engineer
+Midwife
+Model
+Nanny
+Nurse (RN)
+Outdoor Guide
+Paleontologist
+Paralegal
+Parole Officer
+Personal Assistant (to a Celebrity)
+Personal Trainer
+Pest Control Technician
+Physical Therapist
+Pilot
+Police Officer
+Professional Athlete
+Radio DJ
+Rancher
+Real Estate Agent
+Recruiter
+Referee
+Server (Waiter or Waitress)
+Skydiving Instructor
+Small Business Owner
+Tattoo Artist
+Taxidermist
+Teacher
+Therapist (Mental Health)
+Tour Guide
+Treasure Hunter
+Veterinarian
+Wedding Planner
+Yoga Instructor
+
+Table: CharWound YA
+Hidden:
+Accidentally Killing Someone
+A Family Member’s Suicide
+A Home Invasion
+A House Fire
+A Parent’s Abandonment
+A Role Model Who Disappoints
+A Sibling’s Betrayal
+A Speech Impediment
+Becoming a Caregiver at an Early Age
+Being Bullied
+Being Fired or Laid Off
+Being Held Captive
+Being Mugged
+Being Publicly Humiliated
+Being Raised by Neglectful Parents
+Being Raised by Overprotective Parents
+Being So Beautiful It’s All People See
+Being the Victim of a Vicious Rumor
+Being Stalked
+Being Trapped in a Collapsed Building
+Being Unfairly Blamed For The Death of Another
+Discovering One’s Parent is a Monster
+Discovering One’s Sibling Was Abused
+Failing At School
+Failing To Do The Right Thing
+Finding Out One Was Adopted
+Getting Lost In a Natural Environment
+Growing Up In A Cult
+Growing Up in a Dangerous Neighborhood
+Growing Up In Foster Care
+Growing Up In The Public Eye
+Growing Up In The Shadow of a Successful Sibling
+Growing Up with a Sibling Who Has a Chronic Disability or Illness
+Having Parents Who Favored One Child Over Another
+Having To Kill Another Person To Survive
+Losing a Limb
+Losing a Loved One To A Random Act of Violence
+Making a Very Public Mistake
+Overly Critical or Strict Parents
+Physical Disfigurement
+Rejection By One’s Peers
+Telling The Truth But Not Being Believed
+Victimization via Identity Theft
+Watching A Loved One Die
+Wrongful Imprisonment
+Spending Time In Jail
+Suffering From a Learning Disability
+
+Table: CharWound MG
+Hidden:
+A Home Invasion
+A House Fire
+A Parent’s Abandonment
+A Role Model Who Disappoints
+A Sibling’s Betrayal
+A Speech Impediment
+Becoming a Caregiver at an Early Age
+Being Bullied
+Being Fired or Laid Off
+Being Held Captive
+Being Mugged
+Being Publicly Humiliated
+Being Raised by Neglectful Parents
+Being Raised by Overprotective Parents
+Being the Victim of a Vicious Rumor
+Being Trapped in a Collapsed Building
+Being Unfairly Blamed For The Death of Another
+Discovering One’s Parent is a Monster
+Failing At School
+Failing To Do The Right Thing
+Finding Out One Was Adopted
+Getting Lost In a Natural Environment
+Growing Up In A Cult
+Growing Up in a Dangerous Neighborhood
+Growing Up In Foster Care
+Growing Up In The Public Eye
+Growing Up In The Shadow of a Successful Sibling
+Growing Up with a Sibling Who Has a Chronic Disability or Illness
+Having Parents Who Favored One Child Over Another
+Losing a Limb
+Losing a Loved One To A Random Act of Violence
+Making a Very Public Mistake
+Overly Critical or Strict Parents
+Physical Disfigurement
+Rejection By One’s Peers
+Telling The Truth But Not Being Believed
+Victimization via Identity Theft
+Watching A Loved One Die
+Wrongful Imprisonment
+Suffering From a Learning Disability
+
+Table: CharFear YA
+Hidden:
+A Loved One Dying
+A Secret Being Revealed
+Abandonment
+Agoraphobia
+Becoming What One Hates
+Being Capable of Harm
+Being a Burden to Others
+Being Labeled
+Being Pitied
+Being Physically Touched
+Being Returned to an Abusive Environment
+Being Taken Advantage Of
+Being Watched
+Certain Kinds of People
+Change
+Conditional Love
+Conflict
+Criticism
+Crowds
+Death
+Discrimination
+Failure
+Feeling Unsafe
+Government
+Growing Old
+Having No Purpose
+Hope
+Humiliation
+Isolation
+Leading
+Leaving Behind No Legacy
+Letting Others Down
+Losing Autonomy
+Losing Control
+Losing Financial Security
+Losing One’s Heritage or Cultural Identity
+Losing the Respect of Others
+Love
+Mediocrity
+Never Finding Happiness
+Not Being Believed
+Not Fitting In
+One’s Genetics
+Physical Pain
+Putting Yourself Out There
+Rejection
+Relational Commitment
+Responsibility for Others
+Sex
+Sickness
+
+Table: CharFear MG
+Hidden:
+A Loved One Dying
+A Secret Being Revealed
+Abandonment
+Agoraphobia
+Becoming What One Hates
+Being Capable of Harm
+Being a Burden to Others
+Being Labeled
+Being Pitied
+Being Physically Touched
+Being Returned to an Abusive Environment
+Being Taken Advantage Of
+Being Watched
+Certain Kinds of People
+Change
+Conditional Love
+Conflict
+Criticism
+Crowds
+Death
+Discrimination
+Failure
+Feeling Unsafe
+Government
+Growing Old
+Having No Purpose
+Hope
+Humiliation
+Isolation
+Leading
+Leaving Behind No Legacy
+Letting Others Down
+Losing Autonomy
+Losing Control
+Losing Financial Security
+Losing One’s Heritage or Cultural Identity
+Losing the Respect of Others
+Love
+Mediocrity
+Never Finding Happiness
+Not Being Believed
+Not Fitting In
+One’s Genetics
+Physical Pain
+Putting Yourself Out There
+Rejection
+Responsibility for Others
+Sickness
+
+Table: CharMotivation YA
+Hidden:
+Achieving Spiritual Enlightenment
+Avoiding Financial Ruin
+Beating an Illness or Diagnosis
+Being Appreciated by Family
+Being a Leader
+Being the Best at Something
+Caring for an Aging Parent
+Carrying on a Legacy
+Catching the Bad Guy or Girl
+Dealing with a Mental Condition
+Discovering One’s True Self
+Entering & Winning a Competition
+Escaping a Dangerous, Unwanted Life
+Escaping a Killer
+Escaping a Widespread Disaster
+Escaping Certain Death
+Escaping Confinement
+Escaping Homelessness
+Escaping Invaders
+Finding Friendship
+Finding a Lifelong Partner
+Gaining Fulfillment by Giving Back
+Helping a Loved One Who’s Hurting Themselves
+Obtaining Shelter from the Elements
+Overcoming Abuse & Learning to Trust
+Overcoming Addiction
+Protecting One’s Home or Property
+Pursuing Justice
+Realizing a Dream
+Reconciling with an Estranged Family Member
+Rescuing a Loved One from a Captor
+Restoring a Name or Reputation
+Righting a Deep Wrong
+Seeking One’s Biological Roots
+Stopping an Event from Happening
+Trying Again Despite a Past Failure
+
+Table: CharMotivation MG
+Hidden:
+Achieving Spiritual Enlightenment
+Avoiding Financial Ruin
+Beating an Illness or Diagnosis
+Being Appreciated by Family
+Being a Leader
+Being the Best at Something
+Caring for an Aging Parent
+Carrying on a Legacy
+Catching the Bad Guy or Girl
+Dealing with a Mental Condition
+Discovering One’s True Self
+Entering & Winning a Competition
+Escaping a Dangerous, Unwanted Life
+Escaping a Killer
+Escaping a Widespread Disaster
+Escaping Certain Death
+Escaping Confinement
+Escaping Homelessness
+Escaping Invaders
+Finding Friendship
+Gaining Fulfillment by Giving Back
+Helping a Loved One Who’s Hurting Themselves
+Obtaining Shelter from the Elements
+Overcoming Abuse & Learning to Trust
+Protecting One’s Home or Property
+Pursuing Justice
+Realizing a Dream
+Reconciling with an Estranged Family Member
+Rescuing a Loved One from a Captor
+Restoring a Name or Reputation
+Righting a Deep Wrong
+Seeking One’s Biological Roots
+Stopping an Event from Happening
+Trying Again Despite a Past Failure
