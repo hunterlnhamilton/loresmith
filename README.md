@@ -70,12 +70,16 @@ Everything is a normal markdown note.
 ```
 Lore/
   Example Project/              ← a project
-    Arcs
-    Bestiary
+    Arcs/                     ← story arcs (nice for plotting)
+    Bestiary/                     ← beasts
     Calendar.md                 ← the primary calendar
     Calendars/Westerosi Calendar.md
-    Characters/Daenerys Targaryen.md
+    Characters/Daenerys Targaryen.md 
+    Events/
+    Flora/                     ← plants
+    Holidays/
     Nations/Westeros.md
+    Notes/                     ← drafting space outside of the story proper, scratch sheets
     Regions/The North.md
     Settlements/King's Landing.md
     Locations/Crossroads Inn.md
