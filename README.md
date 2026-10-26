@@ -1,8 +1,9 @@
 # Loresmith
 
-Loresmith is a worldbuilding and story manager for [Obsidian](https://obsidian.md). It keeps characters, places,
-cultures, species, creatures, items, events, languages and stories together in one project, works out how
-everything is connected, and helps you plan, write and track a book, all stored as ordinary markdown notes.
+Loresmith is a worldbuilding and story manager for [Obsidian](https://obsidian.md). It keeps characters, nations,
+settlements, cultures, species, creatures, items, events, calendars, languages and stories together in one project,
+works out how everything is connected, and helps you plan, write and track a book, all stored as ordinary markdown
+notes.
 
 - **Plain markdown, no database.** Every entry is a note with frontmatter, so your work stays readable without the
   plugin and works with the graph, backlinks, search, Dataview and Bases.
@@ -19,10 +20,14 @@ everything is connected, and helps you plan, write and track a book, all stored 
 - [Characters](#characters)
 - [Relationships](#relationships)
 - [Organizations, groups and roles](#organizations-groups-and-roles)
+- [Places](#places)
 - [Species, creatures and plants](#species-creatures-and-plants)
 - [Stories, chapters and scenes](#stories-chapters-and-scenes)
 - [Outlines and plot arcs](#outlines-and-plot-arcs)
-- [Time: timeline, calendar and holidays](#time-timeline-calendar-and-holidays)
+- [Time: events, timeline and dates](#time-events-timeline-and-dates)
+- [Calendars](#calendars)
+- [Holidays](#holidays)
+- [The Calendar page](#the-calendar-page)
 - [Languages and the dictionary](#languages-and-the-dictionary)
 - [Relations web](#relations-web)
 - [Who has met whom](#who-has-met-whom)
@@ -55,6 +60,9 @@ everything is connected, and helps you plan, write and track a book, all stored 
    anything else.
 4. Click the **bookmark** icon in the ribbon to open the sidebar panel, and keep it open while you write.
 
+A project starts on the modern calendar with today's date as the present, so a contemporary story needs no setup. See
+[Calendars](#calendars) to give your world its own.
+
 ## How your data is stored
 
 Everything is a normal markdown note.
@@ -62,10 +70,16 @@ Everything is a normal markdown note.
 ```
 Lore/
   Example Project/              ← a project
+    Calendar.md                 ← the primary calendar
+    Calendars/Coastal Calendar.md
     Characters/Elena Hart.md
-    Locations/Saltmarsh.md
+    Nations/Kingdom of Westmarch.md
+    Regions/Grey Mountains.md
+    Settlements/Kingsport.md
+    Locations/The Crooked Lantern.md
     Organizations/Lantern Guild.md
-    Calendar.md                 ← the project's calendar
+    Events/Siege of Kingsport.md
+    Holidays/Midwinter Feast.md
     Stories/
       First Draft/
         First Draft.md          ← story note: synopsis, main characters, chapter order
@@ -75,8 +89,8 @@ Lore/
 ```
 
 - Each entry has `type: <type>` in its frontmatter (`lore:` is also read).
-- Links between entries (species, residence, member of, owns and so on) are frontmatter wikilinks, so they appear in
-  the graph, backlinks, Dataview and Bases.
+- Links between entries (species, residence, member of, nationality and so on) are frontmatter wikilinks, so they
+  appear in the graph, backlinks, Dataview and Bases.
 - The large text boxes in the editor are the note's `## Heading` sections. Edit them in Loresmith or in the note.
 - Custom attributes are top-level properties, listed in `attributes` to keep their order.
 - Scene folders follow a chapter/scene layout that works alongside other writing plugins such as Longform and Novelr.
@@ -115,14 +129,14 @@ Grid or list layout, search, and a right-click menu to open, open as a note, mov
   overview or with the folder button in the sidebar; it is remembered per type. Click a heading to fold it, and use
   the **+** on a heading to create an entry in that folder or with that type.
 - **Nesting**: subspecies sit under their species, branches under the organization they are part of, and places
-  under the place they are part of.
+  under the place they are part of (a province under its kingdom, a district under its city).
 - **Move to folder…** in an entry's right-click menu files it into a subfolder with its links intact.
 
 ### Entry editor
 
 Section editors with preview, reorderable Details sections, linked fields, custom attributes, tags and a
-**Linked from** list. Fields such as Classification, Type, Era, Status, Role, Heritage and Part of speech suggest
-values you have already used, so "Noble" and "noble" don't become two groups.
+**Linked from** list. Fields such as Classification, Type, Era, Status, Role, Heritage, Government and Part of speech
+suggest values you have already used, so "Noble" and "noble" don't become two groups.
 
 ## Entries
 
@@ -130,14 +144,15 @@ values you have already used, so "Noble" and "noble" don't become two groups.
 | --- | --- |
 | People | Characters, Organizations, Cultures, Species |
 | Nature | Creatures (Bestiary), Plants (Flora) |
-| Places | Locations |
+| Places | Nations, Regions, Settlements, Locations |
 | Things | Items, Discoveries, Relations |
-| History | Events, Holidays, plus the Timeline and Calendar |
+| History | Events, Holidays, Calendars, plus the Timeline and the Calendar page |
 | Language | Languages, Dictionary words |
 | Plotting | Stories, Plot arcs, Notes |
 
-Every entry lists **Connections**: what it links to and what links to it. A location shows its residents, who was
-born there and its events; an organization shows its members; a species shows its characters.
+Every entry lists **Connections**: what it links to and what links to it. A nation shows its people, settlements and
+the regions it holds; a settlement shows its residents, who was born there and its events; an organization shows its
+members; a species shows its characters.
 
 ## Characters
 
@@ -157,8 +172,11 @@ Other details:
 - **Birth names**: the Birth name field holds a maiden or former name, shown as "née …" (or "né", or "born" when
   gender isn't set) under their name, on relationship cards and in the family tree. Searching for it finds them.
 - **Heritage**: a free label for what people call someone, separate from biology ("noble-born", "clanless").
+- **Nationality** (Identity group): the nations they belong to. The nation's page lists them, and if the nation keeps
+  a calendar, their dates are read in it.
 - **Initials** on cards and avatars use the first and last name ("Elena Mae Hart" is EH).
-- **Ages** are worked out from their birth date and the story's in-world date (see [Time](#time-timeline-calendar-and-holidays)).
+- **Ages** are worked out from their birth date and the story's in-world date (see
+  [Time](#time-events-timeline-and-dates)). Ages count in the calendar the birth date is written in.
 - The **Species** check on the profile only appears once the project has a species, so the plugin suits any genre.
 
 ### Scene cast
@@ -189,8 +207,8 @@ ties:
   - "[[Jonah]]: Friend (1015–)"
   - "[[Rafe]]: Lover (until 1010)"
   - "[[Rafe]]: Nemesis (1010–)"
-  - "[[Corin]]: Ex-wife"
-  - "[[Pell]]: Brother, estranged"
+  - "[[Claire]]: Ex-wife"
+  - "[[Paul]]: Brother, estranged"
 ```
 
 - The current stage becomes the relationship card, with "Before: Former enemy (1000–1015)" underneath.
@@ -204,8 +222,9 @@ ties:
 
 With **Keep links two-way** on (the default), adding or removing a link also updates the other note: spouses,
 partners, siblings, friends, allies, rivals, enemies, mentors and students, parents and children, members, leaders,
-owners, pioneers, regions and cultures. **Make relationship links two-way** fills in every missing side in the
-project at once; nothing is removed.
+owners, pioneers, cultures and the places they live, languages and where they are spoken, calendars and who keeps
+them, and between nations: allies, rivals, wars, and what came before and after. **Make relationship links two-way**
+fills in every missing side in the project at once; nothing is removed.
 
 ## Organizations, groups and roles
 
@@ -234,34 +253,86 @@ roles:
 - **Groups and positions** on character sheets: every group they are or were in, with each title and its years,
   active ones first. The header shows their current titles.
 
+## Places
+
+There are four kinds of place, because a kingdom isn't a culture, an organization or a building.
+
+| Kind | For | Folder |
+| --- | --- | --- |
+| **Nations** | Kingdoms, empires, republics, city-states, clan lands | `Nations/` |
+| **Regions** | Continents, provinces, forests, mountain ranges, seas, islands | `Regions/` |
+| **Settlements** | Cities, towns, villages, forts, ports | `Settlements/` |
+| **Locations** | Everything else: taverns, temples, ruins, schools, battlefields | `Locations/` |
+
+### Nations
+
+- **Type** and **Status** ("Thriving", "In decline", "Fallen").
+- **Rule**: Government, Ruled by (characters or organizations), Ruling house, Capital, and **Part of** for a vassal,
+  province or member of a federation.
+- **Land**: Territory (the regions it holds) and Population.
+- **People**: Cultures, Species, Languages, Faiths and Calendars, as many of each as you need, since a kingdom usually
+  holds more than one people.
+- **Ties**: Allies, Rivals, At war with, and Currency.
+- **History**: Founded, Fell, Came after and Followed by.
+- Sections: About, Government, Society, Economy, Military, History, plus Laws and Foreign Relations.
+
+The page shows how long it stood and how long ago it fell. Its founding and fall go on the timeline and the calendar.
+
+### Regions
+
+Type, Part of (a larger region), Terrain, Climate, Population, Cultures and Languages. Sections: About, Geography,
+Climate, Ecology, History.
+
+### Settlements
+
+Type, **Nation** (the nation it belongs to), **In** (the region it's in, or the city it's a district of), Ruled by,
+Population, Cultures, Languages, Founded and Status. Sections: About, Districts, People, Economy, History.
+
+### Linking places
+
+Anywhere a place is asked for (a birthplace, a residence, where an event happened, a culture's lands, a creature's
+habitat, where a language is spoken, an item's origin), any of the four kinds will do.
+
+### Sorting older locations
+
+Projects from before places were split up have everything under Locations. **Sort into nations, regions…** on the
+Locations page (or the **Sort locations into nations, regions and settlements** command) lists every location with a
+guess from its Type and name: "Kingdom" becomes a Nation, "Continent" a Region, "City" a Settlement. Change any guess
+before moving. To change a single place, use the swap icon on its page or **Change kind of place…** in its right-click
+menu.
+
+- Links keep working, and subfolders carry over (`Locations/North/Kingsport.md` becomes
+  `Settlements/North/Kingsport.md`).
+- A city that was **Part of** a kingdom becomes a settlement of that nation.
+
 ## Species, creatures and plants
 
 ### Species
 
-Three layers. A species' **Classification** sits above it ("Being", "Beast", "Spirit", or a path like
-"Beast › Dragon"). **Subspecies of** sits below, as many levels deep as you like, and a subspecies without its own
-classification inherits its parent's.
+Three layers. A species' **Classification** sits above it ("Person", "Animal", or a path like "Animal › Bird").
+**Subspecies of** sits below, as many levels deep as you like, and a subspecies without its own classification
+inherits its parent's.
 
 ```
-Being    › Human › Highlander, Lowlander
-Being    › Elf   › Wood Elf, Sea Elf
-Beast    › Dragon › Ash Drake
+Person   › Human › Highlander, Lowlander
+Animal   › Dog   › Sheepdog, Hound
+Animal   › Bird  › Raven
 ```
 
 - The Species page groups everything under its classification, with subspecies indented under their parents.
 - Each species page lists its characters, including those of every subspecies.
-- A character's header shows the whole line ("Wood Elf · Elf · Being").
-- Note names are unique, so name subspecies in full ("Wood Elf").
+- A character's header shows the whole line ("Highlander · Human · Person").
+- Note names are unique, so name subspecies in full ("Highland Pony", not "Highland").
 
 ### Hybrids and ancestry
 
-- For a one-off mix, give a character more than one Species ("Human, Elf").
-- For a mixed people with a name of its own, make it a species and set **Hybrid of** ("Half-elf" → Human, Elf).
+- For a one-off mix, give a character more than one Species ("Wolf, Dog").
+- For a mix with a name of its own, make it a species and set **Hybrid of** ("Wolfdog" → Wolf, Dog).
 - **Ancestry** is worked out from the family tree: each parent gives half, all the way up. A character with parents of
-  different species gets a line like "Ancestry: ½ Elf, ½ Human", "¾ Human, ¼ Elf" a generation later, or
+  different species gets a line like "Ancestry: ½ Wolf, ½ Dog", "¾ Dog, ¼ Wolf" a generation later, or
   "Human (½ Highlander, ½ Lowlander)" within one species. Named hybrids count as their parts.
 - If the parents can't have produced the species you set, the line becomes a dashed "Parents: …" warning, which is
-  fine for someone who was turned or cursed and a continuity check otherwise.
+  fine for someone who was changed by magic or science and a continuity check otherwise.
 
 ### Bestiary and Flora
 
@@ -275,9 +346,9 @@ belong to). Each has its own folder (`Bestiary/`, `Flora/`).
   Sections: About, Appearance, Uses, Lore, plus Cultivation.
 
 Both work like species: Classification groups the list, variants nest under their parent, and the page shows key facts
-at the top (deadly threats and toxins in red). Characters have a **Creatures** field for pets, mounts and familiars,
-kept two-way with the creature's Companions. Items have **Made from**, events can involve creatures, and locations
-list the creatures and plants that live there.
+at the top (deadly threats and toxins in red). Characters have a **Creatures** field for pets, mounts and companions,
+kept two-way with the creature's Companions. Items have **Made from**, events can involve creatures, and places list
+the creatures and plants that live there.
 
 **Moving existing species**: **Move to Species, Bestiary or Flora** (on a species page and in its right-click menu)
 moves the entry and everything filed under it, renaming Subspecies of to Variant of and Homeland to Habitat, with every
@@ -285,7 +356,8 @@ link kept. **Move a whole classification of species to the Bestiary or Flora** m
 
 ## Stories, chapters and scenes
 
-- **Story notes** hold the synopsis, themes, main characters, locations, status, word goal, deadline and present date.
+- **Story notes** hold the synopsis, themes, main characters, locations, status, word goal, deadline, present date and
+  the calendar the story's dates are read in.
 - **Chapters board**: chapters and scenes with word counts, clickable status dots (draft / revised / done), reordering
   through menus, moving scenes between chapters, and compiling a story into one note. Scenes and chapters attached to
   an outline card show that beat's name.
@@ -313,101 +385,347 @@ them, or turn a card into a new scene. Saved as `<Story> outline.md` in the stor
 An optional `type: arc` entry for a thread you want to develop in depth, with Premise, Stakes and Resolution. Link a
 plot line to it from the outline's column menu, and the arc's page lists every card on that line and its events.
 
-## Time: timeline, calendar and holidays
+## Time: events, timeline and dates
 
 ### In-world dates
 
 Set when a story, chapter or scene takes place (the story's **Present date**, or **Set chapter date** /
 **Set scene date** on the chapters board). Character pages show their age, appearances show their age in each scene
-(red if the scene falls before birth or after death), and organizations, events and the timeline show "N years ago".
+(red if the scene falls before birth or after death), and organizations, nations, events and the timeline show
+"N years ago". Ages count from the latest date in the project.
 
-Dates can be written however your world writes them: "6 October 2026", "October 6, 2026", "6 Oct 2026", a date
-property ("2026-10-06") or your own calendar's months.
+Write dates however your world writes them:
+
+- "6 October 2026", "October 6, 2026", "6 Oct 2026", or a date property ("2026-10-06").
+- Your own calendar's months and years: "14 Thaw, 1041 AF", "8 Harvest, 9:41 Ninth".
+- A year on its own: "1041 AF", "9:41 Ninth", "-395 Old".
+- Dates in a calendar other than the usual one can name it: "Coastal: 3 Early Spring, 400" or
+  "3 Early Spring, 400 (Coastal)". See [Which calendar a date is in](#which-calendar-a-date-is-in).
+
+### Events
+
+An event has a **Starts** and an **Ends** date, and both take a full date in any calendar and any way of writing
+years.
+
+- Leave **Ends** empty for something that happened on one day.
+- **Ends** can leave out the year ("10 Harvest"). It's then the next such day after the start, so a siege from
+  "20 Long Night, 1041 AF" to "5 Thaw" ends in 1042 AF.
+- The event's page says how long it lasted ("1 year, 165 days", "3 days") and what both days are in your other
+  calendars, or why a date can't be read.
+- Other fields: Calendar, Era, Type, Involved (characters, organizations, cultures, species, creatures), Where and
+  Plot arcs. Sections: About, Causes, Consequences.
+
+Older notes that used **Sort year** and an **Ends** year still read the same.
 
 ### Timeline
 
-`type: event` entries (date, sort year, era, who was involved, where, which plot arcs) in historical order, grouped by
-era, plus character births and deaths and organization foundings. Filter to one character, organization or arc.
-Characters get a Timeline section, arcs an Events section.
+Events in historical order, grouped by era, with characters' births and deaths and the foundings and falls of
+organizations, nations and settlements. Filter to one character, organization, culture or plot arc. Characters get a
+Timeline section, arcs an Events section.
 
-The timeline sorts by an event's **Sort year** when set, otherwise by the year in its date. Years in an era that counts
-backwards (BC and BCE, or your own) sort as negative years.
+- Every date is sorted by the day it falls on, whatever calendar it's written in. An event sorts by the day it starts.
+- Events that last show their span ("1040 AF–1042 AF") and how long they lasted.
+- **Years in** (when the project has more than one calendar) shows every year in the calendar you pick, or in
+  **In use at the time**: each date in the calendar people used then, with a heading wherever the reckoning changes.
+  Entries written in another calendar carry its name and the converted day.
+- Calendars with eras get a heading at the start of each era ("Third Age, 100 years").
+- **Calendar history** (dashed entries, hidden with the **Calendar history** button): eras beginning, calendars coming
+  into and falling out of use, calendar changes, holidays first and last held, and history notes.
 
-### The world's calendar
+## Calendars
 
-Out of the box every project uses the modern calendar (January to December, leap years, real weekdays, Earth's moon)
-with today's date as the present, so a contemporary story needs no setup. Everything else lives in the project's
-**Calendar note** (`Lore/<Project>/Calendar.md`), opened from the Calendar page, **Settings → Loresmith → World
-calendar**, or **Open calendar note**.
+A project can keep as many calendars as its cultures use, and they all count the same days: a date written in one lands
+on the right day of every other.
+
+- The first calendar is the **primary** calendar, at `Lore/<Project>/Calendar.md`. It reads dates that give no other
+  clue, and its years are the ones shown on ages, roles and "years ago". Others go in `Lore/<Project>/Calendars/`.
+- Each calendar is a note with `type: calendar`. The calendar editor writes it for you; you can also edit it by hand.
+
+### Making a calendar
+
+The calendar-plus button on the Calendar page, the **Create calendar** command, or **Settings → Loresmith →
+Calendars → New calendar**. Start from:
+
+- **Blank**: your own months, week and moons.
+- **Modern (Gregorian)**: January to December with leap years, the real week and Earth's moon.
+- **Thirteen months of 28 days**: every month starts on the same weekday, plus a year day and a leap day.
+- **Twelve months of 30 days + 5**: twelve even months and five festival days, with a leap day every fourth year.
+- **Lunar**: months of 30 and 29 days with a leap month in some years.
+- **A copy** of one of your calendars, to change from there.
+
+### The calendar editor
+
+The pencil on the Calendar page, or **Edit a calendar**, opens one page with everything about a calendar. It shows the
+length of the year, how years will be written and how the calendar lines up as you type.
+
+- **Name**: name, short name and color. The short name marks dates written in it ("Coastal: 3 Early Spring, 400").
+- **Kind of calendar**: modern or custom.
+- **Months**: a table of names, days and leap rules (see below). Write "Frost/Fr" to accept a short form too.
+- **Week**: one weekday per line, starting with the weekday of the first day of year 1. Leave it empty for no week.
+  **Keep step with** another calendar pairs its weekdays with that calendar's (see
+  [Weeks in step](#weeks-in-step)).
+- **New Year**: the day the year number changes, if not the first day of the first month (see
+  [New Year](#new-year-partway-through-the-months)).
+- **Moons**: name, days per cycle, and the day after year 1 began on which it was new.
+- **Years and eras**: how years are numbered (see [Eras](#eras)).
+- **In use**: when people used the calendar (see [Calendars that come and go](#calendars-that-come-and-go)).
+- **How it lines up**: one day you know in both calendars (see [Lining calendars up](#lining-calendars-up)).
+- **Kept by**: the cultures, organizations, peoples, nations or places that use it.
+- **Present day** (primary calendar): the world's "now", written in any calendar. Leave it empty for today on a modern
+  calendar.
+
+### Months and leap years
+
+Each month has a name and a number of days. A leap rule adds days in some years:
+
+| Leap rule | Means |
+| --- | --- |
+| `+1 every 4` | One extra day every fourth year |
+| `+1 every 4, except every 100, but every 400` | The Gregorian rule |
+| `0, +30 every 3` (as the month's days and rule) | A whole leap month that only exists every third year |
+
+Leap days are counted exactly, so conversions between calendars never drift.
+
+### Eras
+
+Every calendar numbers its years with its own list of **eras**, oldest first. Each era has:
+
+- a **name** and a **short form** (several spellings allowed: "BC/BCE"),
+- how many **years** it lasts (blank for an open-ended era at either end),
+- how its years **count**: *up from* a number (1, 2, 3 …), *up to* a number (… -2, -1), or *down to* a number
+  (… 3, 2, 1),
+- optionally, how its years are **written** (see the patterns below).
+
+The first era that counts up is where the count starts; the others follow on before and after it. **Start from** in
+the editor fills in each of these:
+
+| Shape | Eras | Years read |
+| --- | --- | --- |
+| Plain years (the default) | BC/BCE, down to 1 · plain numbers, up from 1 | 395 BC, 2026 |
+| BC and AD | Before Christ (BC/BCE), down to 1 · Anno Domini (AD), up from 1 | 395 BC … 1 BC, 1 AD … 2026 AD |
+| Before and after a founding | Before the Founding (BF), down to 1 · After the Founding (AF), up from 1 | 120 BF, 1041 AF |
+| One count through zero | (YC), up from 1 | -395 YC, 0 YC, 1 YC |
+| Negative years, then ages | Old Era (Old), up to -1 · First Age (First), 100 years · Second Age (Second), 100 years … | -1195 Old, 1:1 First, 9:41 Ninth |
+| Eras of different lengths | Before the Eras (BE), down to 1 · First Era (1E), 2920 years · Second Era (2E), 896 years · Third Era (3E), 433 years · Fourth Era (4E), open | 500 BE, 1E 2920, 4E 201 |
+
+- **Then keep adding eras of N years**: eras of that length keep coming after the last one listed, numbered until you
+  name them ("10:5"). Write "?" as the name of an era that isn't named yet.
+- **Skip year 0** for a count that goes … -1, 1 … instead of … -1, 0, 1 ….
+- **Years are written** sets the default pattern, and each era can have its own:
+
+| Pattern | Example |
+| --- | --- |
+| `{y} {short}` | 1041 AF |
+| `{short} {y}` | AD 1041, 4E 201 |
+| `{n}:{y} {short}` | 9:41 Ninth |
+| `{y} {name}` | 41 Ninth Age |
+| `Year {y} of the {name}` | Year 41 of the Ninth Age |
+| `{y} {ord} {word}` | 41 9th Age |
+| `{roman}.{y}` | IX.41 |
+
+`{y}` is the year within the era, `{n}` the era's number (the first era that counts up is 1), `{ord}` "9th",
+`{roman}` "IX", `{word}` what eras are called (Age, Era). Any of these spellings is understood when you type a date,
+so "Ninth 41", "9:41" and "9:41 Ninth" are the same year. Under every era the editor shows the years it covers as
+they'll be written, and warns if two years would read the same.
+
+Underneath, years count straight through, so ages, "years ago", sorting and converting between calendars all work
+across era boundaries.
+
+### New Year partway through the months
+
+A calendar can keep its months in their usual order but change the year number on another day: a year running from
+1 June to 31 May, a fiscal year from 1 October, or the old English year that began on 25 March.
+
+- Set **The year begins on** ("1 June") and whether a year is numbered by the year it **begins** in or **ends** in.
+- Leap days, weekdays and holidays stay where they are; only the year number moves. On a June-start calendar,
+  "3 March 2026" is the March after June 2026 (plain 3 March 2027).
+- The year view runs from the New Year's month to the month before it, dimming the days of a split month that belong
+  to the year before or after.
+- Write dates, including the line-up, the way this calendar numbers them. Lining up on a day just after the New Year
+  ("1 June 2000 = 1 June 2000") is the easiest.
+
+Two calendars with different months already start their years on different days: line them up and every date
+converts.
+
+### Lining calendars up
+
+On any calendar but the primary, under **How it lines up**, write one day you know in both, with "=" between:
+
+```
+1 Early Spring, 1 = 14 Thaw, 900 AF
+```
+
+From that one day, every date converts exactly in both directions, and a calendar can line up against any other, not
+only the primary. As you type, the editor:
+
+- shows where the present day falls in this calendar,
+- says whether the two years are the same length. If they aren't, it warns how far they drift apart each year: a
+  330-day year next to a 360-day one moves a month a year, which is right for calendars that really differ, and a
+  sign of a missing month when they shouldn't,
+- lists this calendar's months next to the other's, starting from the line-up day, so you can check they match.
+
+Until a calendar is lined up, its year 1 is taken to begin on the same day as the primary's, and the Calendar page
+reminds you.
+
+### Weeks in step
+
+Each calendar's week counts from its own year 1 unless you say otherwise. Under **Week**, choose **Keep step with**
+another calendar whose week has the same number of days, and the weekdays pair up in order on every day
+(Restday = Sunday, Workday = Monday, …).
+
+### Calendars that come and go
+
+A calendar's **In use** dates ("from 1:1 First", "until 1:20 First", written in any calendar) say when people actually
+used it. A world can keep one count for twelve centuries, switch to a new calendar, and have another people's calendar
+alongside, each in its own period.
+
+- Outside its years, a calendar's holidays aren't kept.
+- Its adoption and end go on the timeline with the calendar history.
+- **In use at the time**, under **Show** on the Calendar page and **Years in** on the Timeline, shows each day in the
+  calendar people used then. Where two calendars were in use at once, the primary is used.
+
+### Which calendar a date is in
+
+When a date doesn't name its calendar, Loresmith checks, in order:
+
+1. a calendar named on the date ("Coastal: 3 Early Spring, 400" or "3 Early Spring, 400 (Coastal)"),
+2. an era or short form only one calendar uses ("400 AF"),
+3. month names only one calendar uses ("Frost"),
+4. the entry's own calendar: its **Calendar** field, its story's, or a calendar kept by its culture, nation, house or
+   group,
+5. the primary calendar.
+
+Moons belong to the world, so every calendar shows the same moons in the same phase. List each moon in one calendar
+only.
+
+### Converting dates
+
+**Convert a date between calendars** (command, or **Settings → Loresmith → Calendars → Convert a date**): type a date
+in any calendar and see it in all of them, with weekdays, ready to copy. Characters, events, organizations and nations
+also show their dates in your other calendars under the date fields.
+
+### The calendar note
+
+For anyone who prefers typing, this is what the editor writes:
 
 ```markdown
 ---
 type: calendar
-present: "12 Thaw, 1060 AR"        # empty: today
-custom_calendar: true              # off: the modern calendar
-custom_eras: true                  # off: BC and plain years
-backward_eras: "Before the Reckoning, BR"
-forward_era: AR
-year_zero: false
+short: Northern
+custom_calendar: true
+align: "1 Frost, 1 AF = 1 January, 900"
+kept_by:
+  - "[[Northern Culture]]"
+week_like: "Calendar"
+in_use_from: "1 Frost, 1 AF"
 ---
 ## Months
-- Deepwinter, 30
-- Thaw, 31
+- Frost, 30
+- Thaw, 30
 - Sowing, 30
+- Blossom, 30
+- High Sun, 30
+- Harvest, 30
+- Falling Leaf, 30
+- Long Night, 35, +1 every 4
 
 ## Weekdays
-- Firstday
-- Moonday
+- Restday
+- Workday
+- Marketday
 
 ## Moons
-- Pale, 29.5, 0
+- Moon, 29.5, 0
+
+## Eras
+- Before the Founding (BF), , down to 1
+- After the Founding (AF), , up from 1
 
 ## History
-- Midwinter Feast: 1 Deepwinter
+- Midwinter Feast: 1 Frost
 - Founders' Day: 3 Thaw (from 1012)
 - Feast of Lanterns: 14 Sowing (until 1050), forgotten after the plague
-- Harvest Night: last Moonday of Sowing
-- 1050: The Grey Plague.
+- Harvest Night: last Marketday of Harvest
+- 1050: The Great Plague.
 
 ## Months (from 1100)
-- Ember, 180
-- Ash, 185
+- Summer, 180
+- Winter, 185
 ```
 
-- The two switches are checkbox properties, so they are toggles in the Properties view and in settings.
-- **Months**, **Weekdays** and **Moons** apply when `custom_calendar` is on. Leave Moons empty on the modern calendar
-  for Earth's moon.
+| Property | Meaning |
+| --- | --- |
+| `primary` | `true` on the primary calendar |
+| `present` | The world's present date (primary calendar); empty for today |
+| `short`, `aliases`, `color` | Names a date can be marked with, and the calendar's color in the views |
+| `custom_calendar` | `false` for the modern calendar |
+| `align` | The line-up: a day here, "=", the same day on another calendar |
+| `kept_by` | Who uses it |
+| `week_like` | Another calendar whose weekdays this one keeps step with |
+| `new_year`, `new_year_numbering` | The day the year number changes, and `start` or `end` |
+| `in_use_from`, `in_use_until` | When it was used |
+| `era_repeat`, `era_format`, `era_word`, `no_year_zero` | Eras that keep coming, the default pattern, what eras are called, and skipping year 0 |
+
 - **History** holds holidays as plain lines ("Name: day Month", or a weekday rule such as "fourth Thursday of
-  November"), with years in brackets for when they were kept ("(from 1012)", "(until 1050)", "(1000–1020)"). Lines
-  that start with a year are history notes.
-- **Calendar changes**: a section with a year in its heading, like `## Months (from 1100)`, takes over from that year.
-  Day counts, weekdays and moons run on unbroken. Write "Modern" in a dated Months section to switch to January to
-  December.
-- The timeline shows calendar history as dashed entries, which the **Calendar history** button hides.
+  November"), with years in brackets for when they were kept ("(from 1012)", "(until 1050)", "(1000–1020)"; here the
+  end year is the first year it isn't held). Lines that start with a year are history notes.
+- **Calendar changes**: a section with a year in its heading, like `## Months (from 1100)` or
+  `## Weekdays (from 1100)`, takes over from that year. Day counts, weekdays and moons run on unbroken. Write "Modern"
+  in a dated Months section to switch to January to December.
+- Notes from earlier versions of Loresmith (the BC/era switches, the old `## Ages` section, and calendar settings from
+  the settings page) keep reading the same, and the editor brings them up to date the next time you save.
 
-### Holidays
+## Holidays
 
-A holiday is its own kind of entry: an event happened once, a holiday comes back every year.
+A holiday is its own kind of entry: an event happened once, a holiday comes back every year, on the calendar of the
+people who keep it.
 
-- **When**: a day and month with no year, or a weekday rule.
-- **Lasts (days)**, **First held** and **Last held**, **Type**, **Kept by** (cultures, organizations, species, places)
-  and **Commemorates** (an event).
+- **When**: one row per calendar it's kept on. Pick the calendar (or let Loresmith work it out from the month names),
+  write the day with no year ("1 Frost", "July 4", "last Marketday of Harvest", "fourth Thursday of November"), and, if
+  that date was only kept for part of history, its years ("from 1012", "1012–1050", "from 100 until 199"; the last year
+  given is the last year it was kept). **Add a date on another calendar** adds a row. A note after a comma
+  ("20 Long Night, the longest night") shows in the day's details.
+- **Lasts (days)**: for festivals longer than a day.
+- **First held** and **Last held**: the years the holiday itself was kept, on every calendar, written in any calendar.
+- **Type**, **Kept by** (cultures, organizations, species, nations, places) and **Commemorates** (an event).
 - About, Traditions and History sections.
 
-The page shows when it next falls, how long it has been kept, or why its date can't be read. Holidays appear on the
-calendar, and their first and last years go on the timeline.
+A holiday the northerners keep on 1 Frost and the coastal people on 20 Early Winter is one entry with two rows; when two
+rows land on the same day, it shows once. In the note, **When** is `date`, one line or a list:
 
-### Calendar page
+```yaml
+date:
+  - "Northern: 1 Frost"
+  - "Coastal: 20 Early Winter (from 100 until 199), the longest night"
+```
 
-Places every dated event, birth, founding and scene on its day, with weekdays, moon phases and holidays.
+The page lists each date with when it next falls, then the soonest of them in every calendar, how long the holiday has
+been kept, or what's wrong with a date ("Frosts" isn't a month on the Northern calendar). Holidays from older versions
+(one date plus a Calendar link) keep working.
 
-- **Year** and **Month** views. Tap a day or a month name in the year view to open that month.
-- In the month view, tap a day for its weekday, holidays, moon phases, everything on that day, a **New event on this
-  day** button and a copy-date button. With no day picked, the side panel lists the month as an agenda.
-- Birthdays and anniversaries repeat every year ("Elena turns 25", "Siege of Saltmarsh · 20 yrs"); round
-  anniversaries are bold, and birthdays stop after a character dies.
+## The Calendar page
+
+Places every dated event, birth, founding and scene on its day, with weekdays, moon phases and holidays, whichever
+calendar each date was written in.
+
+- **Show** picks the calendar to look at, or **In use at the time**. **Alongside** adds a second calendar: every day in
+  the month view carries its date in the other calendar too, and each month in the year view says which months of the
+  other calendar it spans. Switching calendars keeps you on the same days.
+- **Year** and **Month** views. Tap a day or a month name in the year view to open that month. **Go to a date** takes
+  a date in any calendar, and **Present** jumps back to the present day.
+- A line under the toolbar shows the era you're in and how far through it ("Ninth Age, year 41 of 100").
+- In the month view, tap a day for its weekday, the same day on every other calendar (tap one to switch to it),
+  holidays, moon phases, everything on that day, **New event on this day**, **New holiday on this day** and a
+  copy-date button. With no day picked, the side panel lists the month as an agenda.
+- Events that last several days show on every day they run ("Day 2 of 3"), or on their first and last days if they
+  went on for more than a year and a half.
+- Birthdays and anniversaries repeat every year of the calendar they were written in ("Elena turns 25", "Siege of
+  Kingsport · 20 yrs"); round anniversaries are bold, and birthdays stop after a character dies.
+- Holidays of other calendars show in that calendar's color with a ◆.
 - Scenes without their own date use their chapter's or story's date.
 - The legend is also the filter: tap a kind to hide or show it.
+- Moons are drawn at their real phase; the exact new, quarter and full moon days are outlined.
+- Warnings appear when a calendar isn't lined up yet, or wasn't in use in the year you're looking at.
 
 ## Languages and the dictionary
 
@@ -417,12 +735,12 @@ A language is its own kind of entry, so a world can have as many as it needs: in
 languages, and real ones your characters borrow from (set **Basis** to Real-world).
 
 - **Type**, **Status** (living, dying, dead), **Language family**, **Descended from** and **Also called**.
-- **Spoken by** (cultures), **Species**, **Spoken in** (locations) and **Speakers**.
+- **Spoken by** (cultures), **Species**, **Spoken in** (nations, regions, settlements or locations) and **Speakers**.
 - **Word order** and **Script**.
 - About, Sounds, Grammar, Writing and History sections.
 
-Cultures and locations have a **Languages** field kept in step with the language's Spoken by and Spoken in. A
-language's page shows its own dictionary, the words it lent to other languages, and its daughter languages.
+Cultures and places have a **Languages** field kept in step with the language's Spoken by and Spoken in. A language's
+page shows its own dictionary, the words it lent to other languages, and its daughter languages.
 
 ### Dictionary
 
@@ -506,7 +824,8 @@ from the **Generators** group in the navigation or the sidebar, or with the **Ge
 | Place | A location | Type, About, Points of Interest, History (secret and trouble brewing) |
 
 A story prompt's two characters can be saved as characters too, linked to each other by the rolled relationship
-(siblings, rivals, mentor and student, and so on). Everything saved is tagged `generated`.
+(siblings, rivals, mentor and student, and so on). Everything saved is tagged `generated`. A generated place can be
+turned into a nation, region or settlement afterwards with **Change kind of place…**.
 
 ### Generator tables
 
@@ -569,7 +888,12 @@ details go under **Settings → Loresmith → Manuscript and ebook**.
 | Characters in this scene | Edits the active scene's cast |
 | Add an empty characters property to scenes that lack one | Prepares older scenes for scene casts |
 | Open relations web | Opens the relations web |
-| Open timeline / Open calendar / Open calendar note | Opens the timeline, calendar or calendar note |
+| Open timeline / Open calendar | Opens the timeline or the Calendar page |
+| Open calendar note | Opens a calendar's note, asking which one |
+| Edit a calendar | Opens the calendar editor |
+| Create calendar | Makes a new calendar from a template or a copy |
+| Convert a date between calendars | Shows a date in every calendar |
+| Sort locations into nations, regions and settlements | Sorts older locations into the new place categories |
 | Open who has met whom | Opens the meetings view |
 | Open writing log | Opens goals, typing time and authorship |
 | Start pomodoro | Starts a pomodoro that counts typing time |
@@ -589,6 +913,7 @@ details go under **Settings → Loresmith → Manuscript and ebook**.
 - **Writing goals**: the daily word goal and whether the status bar shows today's words.
 - **Typing log**: whether notes outside the lore folder are tracked, the idle limit (seconds), a daily typing-time
   goal and the pomodoro length.
-- **World calendar**: the custom calendar and custom eras switches, year 0, and a button to open the calendar note.
+- **Calendars**: every calendar in the project with its months, week, period of use and who keeps it, and buttons to
+  edit it, open its note or make it the primary; **New calendar**; the **Present date**; and **Convert a date**.
 - **Generators**: install or update the generator tables, with a status line showing whether they are all found.
 - **Manuscript and ebook**: your name, byline, contact details, manuscript font and ebook language.

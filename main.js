@@ -28,7 +28,9 @@ const STATUSES = ['draft', 'revised', 'done'];
 const GROUPS = ['People', 'Nature', 'Places', 'Things', 'History', 'Language'];
 /* Kinds of entry with a classification path and parents above them: species (subspecies), creatures and plants (variants). */
 const TAXA = ['species', 'creature', 'plant'];
-const ANY = ['character', 'organization', 'culture', 'species', 'creature', 'plant', 'location', 'discovery', 'item', 'event'];
+const ANY = ['character', 'organization', 'culture', 'species', 'creature', 'plant', 'nation', 'region', 'settlement', 'location', 'discovery', 'item', 'event'];
+/* Every kind of place: nations (realms), regions (geography), settlements (cities, towns), locations (sites, buildings). */
+const PLACES = ['nation', 'region', 'settlement', 'location'];
 const COLORS = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink'];
 
 /* Relations web: kinds of line. Each relationship kind below maps onto one of these. */
@@ -173,6 +175,34 @@ const INVERSE = {
   'culture.languages': { label: 'Spoken by', one: 'Culture', merge: 'cultures' },
   'language.regions': { label: 'Languages', one: 'Language', merge: 'languages' },
   'location.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
+  'calendar.kept_by': { label: 'Calendars', one: 'Keeps', merge: 'calendars' },
+  'nation.partOf': { label: 'Vassals and provinces', one: 'Vassal' },
+  'nation.territory': { label: 'Held by', one: 'Holds' },
+  'nation.capital': { label: 'Capital of', one: 'Capital' },
+  'nation.dynasty': { label: 'Rules', one: 'Ruling house' },
+  'nation.rulers': { label: 'Rules', one: 'Rules' },
+  'nation.cultures': { label: 'Lands', one: 'Land', merge: 'regions' },
+  'nation.species': { label: 'Nations', one: 'Nation' },
+  'nation.faiths': { label: 'Faith of', one: 'Faith of' },
+  'nation.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
+  'nation.allies': { label: 'Allies', one: 'Ally', merge: 'allies' },
+  'nation.rivals': { label: 'Rivals', one: 'Rival', merge: 'rivals' },
+  'nation.enemies': { label: 'At war with', one: 'Enemy', merge: 'enemies' },
+  'nation.predecessor': { label: 'Followed by', one: 'Successor', merge: 'successor' },
+  'nation.successor': { label: 'Came after', one: 'Predecessor', merge: 'predecessor' },
+  'region.partOf': { label: 'Within', one: 'Within' },
+  'region.cultures': { label: 'Lands', one: 'Land', merge: 'regions' },
+  'region.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
+  'settlement.nation': { label: 'Settlements', one: 'Settlement' },
+  'settlement.partOf': { label: 'Settlements and districts', one: 'Within' },
+  'settlement.rulers': { label: 'Rules', one: 'Rules' },
+  'settlement.cultures': { label: 'Lands', one: 'Land', merge: 'regions' },
+  'settlement.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
+  'character.nationality': { label: 'People', one: 'Citizen' },
+  'culture.calendars': { label: 'Kept by', one: 'Kept by', merge: 'kept_by' },
+  'event.calendar': { label: 'Events dated in it', one: 'Event' },
+  'holiday.calendar': { label: 'Holidays', one: 'Holiday' },
+  'story.calendar': { label: 'Stories', one: 'Story' },
 };
 /* Incoming links that another part of the page already shows. */
 const INVERSE_SKIP = new Set(['species.subspeciesOf', 'creature.variantOf', 'plant.variantOf', 'event.arcs', 'relation.from', 'relation.to', 'character.species']);
@@ -194,6 +224,12 @@ const MIRROR = {
   'location.cultures': 'regions', 'culture.regions': 'cultures',
   'language.cultures': 'languages', 'culture.languages': 'cultures',
   'language.regions': 'languages', 'location.languages': 'regions',
+  'culture.calendars': 'kept_by', 'calendar.kept_by': 'calendars',
+  'nation.cultures': 'regions', 'region.cultures': 'regions', 'settlement.cultures': 'regions',
+  'nation.languages': 'regions', 'region.languages': 'regions', 'settlement.languages': 'regions',
+  'nation.calendars': 'kept_by',
+  'nation.allies': 'allies', 'nation.rivals': 'rivals', 'nation.enemies': 'enemies',
+  'nation.predecessor': 'successor', 'nation.successor': 'predecessor',
 };
 /* A link already counts as present if it sits in one of these sibling fields. */
 const MIRROR_ALSO = { affiliation: ['house', 'education', 'workplace'] };
@@ -233,10 +269,11 @@ const TYPES = {
     fields: [
       { key: 'status', label: 'Status', kind: 'text', placeholder: 'Drafting' },
       { key: 'mainCharacters', label: 'Main characters', kind: 'links', types: ['character'] },
-      { key: 'locations', label: 'Locations', kind: 'links', types: ['location'] },
+      { key: 'locations', label: 'Locations', kind: 'links', types: PLACES },
       { key: 'word_goal', label: 'Word goal', kind: 'number', placeholder: '80000' },
       { key: 'deadline', label: 'Deadline', kind: 'date' },
       { key: 'present_year', label: 'Present date', kind: 'text', placeholder: '12 Frostmoon, 1023 AC' },
+      { key: 'calendar', label: 'Calendar', kind: 'link', types: ['calendar'], placeholder: 'Dates in this story are read in it' },
     ],
   },
   arc: {
@@ -280,6 +317,7 @@ const TYPES = {
       { group: 'Identity', key: 'role', label: 'Role', kind: 'text', placeholder: 'Protagonist, antagonist', suggest: true },
       { group: 'Identity', key: 'occupation', label: 'Occupation', kind: 'text' },
       { group: 'Identity', key: 'heritage', label: 'Heritage', kind: 'text', placeholder: 'Half-blood, noble-born, clanless', suggest: true },
+      { group: 'Identity', key: 'nationality', label: 'Nationality', kind: 'links', types: ['nation'] },
       { group: 'Appearance', key: 'species', label: 'Species', kind: 'links', types: ['species'] },
       { group: 'Appearance', key: 'gender', label: 'Gender', kind: 'text' },
       { group: 'Appearance', key: 'apparent_age', label: 'Looks', kind: 'text', placeholder: 'Mid-twenties' },
@@ -301,11 +339,11 @@ const TYPES = {
       { group: 'Abilities', key: 'weaknesses', label: 'Weaknesses', kind: 'list' },
       { group: 'Abilities', key: 'languages', label: 'Languages', kind: 'list' },
       { group: 'Life', key: 'born', label: 'Born', kind: 'text' },
-      { group: 'Life', key: 'birthplace', label: 'Birthplace', kind: 'link', types: ['location'] },
+      { group: 'Life', key: 'birthplace', label: 'Birthplace', kind: 'link', types: PLACES },
       { group: 'Life', key: 'culture', label: 'Culture', kind: 'links', types: ['culture'] },
-      { group: 'Life', key: 'residence', label: 'Residence', kind: 'links', types: ['location'] },
+      { group: 'Life', key: 'residence', label: 'Residence', kind: 'links', types: PLACES },
       { group: 'Life', key: 'died', label: 'Died', kind: 'text' },
-      { group: 'Life', key: 'death_place', label: 'Place of death', kind: 'link', types: ['location'] },
+      { group: 'Life', key: 'death_place', label: 'Place of death', kind: 'link', types: PLACES },
       { group: 'Life', key: 'cause_of_death', label: 'Cause of death', kind: 'text' },
       { group: 'Life', key: 'first_appearance', label: 'First appearance', kind: 'text', placeholder: 'Found from your scenes' },
       { group: 'Family', key: 'mother', label: 'Mother', kind: 'link', types: ['character'] },
@@ -339,7 +377,7 @@ const TYPES = {
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'School, company, team, gang, band, guild' },
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
       { key: 'founded', label: 'Founded', kind: 'text' },
-      { key: 'headquarters', label: 'Headquarters', kind: 'link', types: ['location'] },
+      { key: 'headquarters', label: 'Headquarters', kind: 'link', types: PLACES },
       { key: 'partOf', label: 'Part of', kind: 'link', types: ['organization'] },
       { key: 'founders', label: 'Founded by', kind: 'links', types: ['character', 'organization'] },
       { key: 'leaders', label: 'Leaders', kind: 'links', types: ['character'] },
@@ -354,8 +392,9 @@ const TYPES = {
     fields: [
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
       { key: 'species', label: 'Species', kind: 'links', types: ['species'] },
-      { key: 'regions', label: 'Regions', kind: 'links', types: ['location'] },
+      { key: 'regions', label: 'Lands', kind: 'links', types: PLACES },
       { key: 'languages', label: 'Languages', kind: 'links', types: ['language'] },
+      { key: 'calendars', label: 'Calendars', kind: 'links', types: ['calendar'] },
       { group: 'Naming', key: 'name_starts', label: 'Name starts', kind: 'list', placeholder: 'Ra, Ev, Leo, Tha' },
       { group: 'Naming', key: 'name_middles', label: 'Name middles', kind: 'list', placeholder: 'va, li, nor' },
       { group: 'Naming', key: 'name_ends', label: 'Name ends', kind: 'list', placeholder: 'na, ric, eth, wyn' },
@@ -371,7 +410,7 @@ const TYPES = {
       { key: 'hybridOf', label: 'Hybrid of', kind: 'links', types: ['species'] },
       { key: 'classification', label: 'Classification', kind: 'text', placeholder: 'Humanoid, Fae, Spirit', suggest: true },
       { key: 'lifespan', label: 'Lifespan', kind: 'text' },
-      { key: 'homeland', label: 'Homeland', kind: 'links', types: ['location'] },
+      { key: 'homeland', label: 'Homeland', kind: 'links', types: PLACES },
     ],
   },
   creature: {
@@ -395,7 +434,7 @@ const TYPES = {
       { key: 'lifespan', label: 'Lifespan', kind: 'text' },
       { key: 'rarity', label: 'Rarity', kind: 'text', suggest: true, placeholder: 'Common, rare, thought extinct' },
       { key: 'active', label: 'Active', kind: 'text', suggest: true, placeholder: 'Nocturnal, winter only' },
-      { key: 'habitat', label: 'Habitat', kind: 'links', types: ['location'] },
+      { key: 'habitat', label: 'Habitat', kind: 'links', types: PLACES },
       { group: 'Abilities', key: 'abilities', label: 'Abilities', kind: 'list', placeholder: 'Venom, flight, mimicry' },
       { group: 'Abilities', key: 'weaknesses', label: 'Weaknesses', kind: 'list', placeholder: 'Silver, fire, salt' },
       { group: 'Abilities', key: 'products', label: 'Yields', kind: 'list', placeholder: 'Hide, venom, scales' },
@@ -420,10 +459,89 @@ const TYPES = {
       { key: 'rarity', label: 'Rarity', kind: 'text', suggest: true, placeholder: 'Common, rare, sacred' },
       { key: 'season', label: 'Season', kind: 'text', placeholder: 'Blooms late spring, fruits in autumn' },
       { key: 'climate', label: 'Climate', kind: 'text', suggest: true, placeholder: 'Marsh, alpine, desert' },
-      { key: 'habitat', label: 'Habitat', kind: 'links', types: ['location'] },
+      { key: 'habitat', label: 'Habitat', kind: 'links', types: PLACES },
       { key: 'parts', label: 'Useful parts', kind: 'list', placeholder: 'Root, bark, seeds' },
       { key: 'uses', label: 'Uses', kind: 'list', placeholder: 'Healing, dye, poison, timber' },
       { key: 'kept_by', label: 'Grown by', kind: 'links', types: ['culture', 'organization'] },
+    ],
+  },
+  nation: {
+    label: 'Nation', plural: 'Nations', folder: 'Nations', icon: 'crown', color: 'orange',
+    group: 'Places', sections: ['About', 'Government', 'Society', 'Economy', 'Military', 'History'], details: ['Laws', 'Foreign Relations'],
+    hints: {
+      About: 'What the realm is, how it sees itself, and how its neighbours see it.',
+      Government: 'Who rules and how: crown, council, church or clan. How power passes on, and who really holds it.',
+      Society: 'The peoples and cultures who live here, classes and castes, faith, what a citizen owes and is owed.',
+      Economy: 'Trade, coin, what it makes and what it lacks.',
+      Military: 'Armies, fleets, orders and fortresses; old wars and present threats.',
+      History: 'How it was founded, what it has won and lost, and how it fell, if it did.',
+    },
+    fields: [
+      { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Kingdom, empire, republic, city-state, clan lands' },
+      { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
+      { key: 'status', label: 'Status', kind: 'text', suggest: true, placeholder: 'Thriving, in decline, fallen, occupied' },
+      { group: 'Rule', key: 'government', label: 'Government', kind: 'text', suggest: true, placeholder: 'Monarchy, theocracy, elected council' },
+      { group: 'Rule', key: 'rulers', label: 'Ruled by', kind: 'links', types: ['character', 'organization'] },
+      { group: 'Rule', key: 'dynasty', label: 'Ruling house', kind: 'links', types: ['organization'] },
+      { group: 'Rule', key: 'capital', label: 'Capital', kind: 'link', types: ['settlement', 'location'] },
+      { group: 'Rule', key: 'partOf', label: 'Part of', kind: 'link', types: ['nation'], placeholder: 'Overlord, empire or federation' },
+      { group: 'Land', key: 'territory', label: 'Territory', kind: 'links', types: ['region', 'location'] },
+      { group: 'Land', key: 'population', label: 'Population', kind: 'text' },
+      { group: 'People', key: 'cultures', label: 'Cultures', kind: 'links', types: ['culture'] },
+      { group: 'People', key: 'species', label: 'Species', kind: 'links', types: ['species'] },
+      { group: 'People', key: 'languages', label: 'Languages', kind: 'links', types: ['language'] },
+      { group: 'People', key: 'faiths', label: 'Faiths', kind: 'links', types: ['organization', 'culture'] },
+      { group: 'People', key: 'calendars', label: 'Calendars', kind: 'links', types: ['calendar'] },
+      { group: 'Ties', key: 'allies', label: 'Allies', kind: 'links', types: ['nation', 'organization'] },
+      { group: 'Ties', key: 'rivals', label: 'Rivals', kind: 'links', types: ['nation', 'organization'] },
+      { group: 'Ties', key: 'enemies', label: 'At war with', kind: 'links', types: ['nation', 'organization'] },
+      { group: 'Ties', key: 'currency', label: 'Currency', kind: 'text' },
+      { group: 'History', key: 'founded', label: 'Founded', kind: 'text' },
+      { group: 'History', key: 'dissolved', label: 'Fell', kind: 'text', placeholder: 'When it ended, if it has' },
+      { group: 'History', key: 'predecessor', label: 'Came after', kind: 'links', types: ['nation'] },
+      { group: 'History', key: 'successor', label: 'Followed by', kind: 'links', types: ['nation'] },
+    ],
+  },
+  region: {
+    label: 'Region', plural: 'Regions', folder: 'Regions', icon: 'mountain', color: 'green',
+    group: 'Places', sections: ['About', 'Geography', 'Climate', 'Ecology', 'History'], details: ['Points of Interest'],
+    hints: {
+      About: 'What this stretch of the world is, and what people think of when they hear its name.',
+      Geography: 'Land and water: mountains, rivers, coasts, roads, borders.',
+      Climate: 'Seasons, weather, what a year here feels like.',
+      Ecology: 'What lives and grows here, and what is dangerous.',
+    },
+    fields: [
+      { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Continent, province, forest, mountains, sea, island' },
+      { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
+      { key: 'partOf', label: 'Part of', kind: 'link', types: ['region'] },
+      { key: 'terrain', label: 'Terrain', kind: 'text', suggest: true, placeholder: 'Marsh, steppe, highlands' },
+      { key: 'climate', label: 'Climate', kind: 'text', suggest: true, placeholder: 'Temperate, arid, frozen' },
+      { key: 'population', label: 'Population', kind: 'text' },
+      { key: 'cultures', label: 'Cultures', kind: 'links', types: ['culture'] },
+      { key: 'languages', label: 'Languages', kind: 'links', types: ['language'] },
+    ],
+  },
+  settlement: {
+    label: 'Settlement', plural: 'Settlements', folder: 'Settlements', icon: 'castle', color: 'cyan',
+    group: 'Places', sections: ['About', 'Districts', 'People', 'Economy', 'History'], details: ['Points of Interest'],
+    hints: {
+      About: 'What the place is like to arrive in: its look, its sound, its reputation.',
+      Districts: 'Quarters, wards, markets, slums and palaces.',
+      People: 'Who lives here, who runs it, and who is unwelcome.',
+      Economy: 'What it trades, makes, and depends on.',
+    },
+    fields: [
+      { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'City, town, village, fortress, port' },
+      { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
+      { key: 'nation', label: 'Nation', kind: 'link', types: ['nation'] },
+      { key: 'partOf', label: 'In', kind: 'link', types: ['region', 'settlement'], placeholder: 'Region, or the city it is a district of' },
+      { key: 'rulers', label: 'Ruled by', kind: 'links', types: ['character', 'organization'] },
+      { key: 'population', label: 'Population', kind: 'text' },
+      { key: 'cultures', label: 'Cultures', kind: 'links', types: ['culture'] },
+      { key: 'languages', label: 'Languages', kind: 'links', types: ['language'] },
+      { key: 'founded', label: 'Founded', kind: 'text' },
+      { key: 'status', label: 'Status', kind: 'text', suggest: true, placeholder: 'Thriving, abandoned, razed' },
     ],
   },
   location: {
@@ -431,9 +549,9 @@ const TYPES = {
     group: 'Places', sections: ['About', 'Geography', 'Climate', 'History'],
     details: ['Points of Interest', 'Economy'],
     fields: [
-      { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'City, school, café, ruin' },
+      { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Tavern, temple, ruin, school, battlefield' },
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
-      { key: 'partOf', label: 'Part of', kind: 'link', types: ['location'] },
+      { key: 'partOf', label: 'Part of', kind: 'link', types: PLACES },
       { key: 'rulers', label: 'Ruled by', kind: 'links', types: ['character', 'organization'] },
       { key: 'population', label: 'Population', kind: 'text' },
       { key: 'cultures', label: 'Cultures', kind: 'links', types: ['culture'] },
@@ -446,7 +564,7 @@ const TYPES = {
     fields: [
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Spell, invention, theory' },
       { key: 'pioneers', label: 'Pioneers', kind: 'links', types: ['character'] },
-      { key: 'origin', label: 'Origin', kind: 'link', types: ['location'] },
+      { key: 'origin', label: 'Origin', kind: 'link', types: PLACES },
     ],
   },
   relation: {
@@ -465,7 +583,7 @@ const TYPES = {
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Heirloom, weapon, car, letter' },
       { key: 'rarity', label: 'Rarity', kind: 'text' },
       { key: 'owners', label: 'Owners', kind: 'links', types: ['character'] },
-      { key: 'origin', label: 'Origin', kind: 'link', types: ['location'] },
+      { key: 'origin', label: 'Origin', kind: 'link', types: PLACES },
       { key: 'materials', label: 'Made from', kind: 'links', types: ['creature', 'plant'] },
     ],
   },
@@ -478,13 +596,13 @@ const TYPES = {
       Consequences: 'What changed because of it.',
     },
     fields: [
-      { key: 'date', label: 'Date', kind: 'text', placeholder: '12 Frostmoon, 1023 AE' },
-      { key: 'year', label: 'Sort year', kind: 'number', placeholder: 'Read from the date if empty' },
-      { key: 'end_year', label: 'Ends', kind: 'number', placeholder: 'Year it ends, if it lasts' },
+      { key: 'date', label: 'Starts', kind: 'text', placeholder: '12 Haring, 9:41 Dragon, or just 9:41 Dragon' },
+      { key: 'end', label: 'Ends', kind: 'text', placeholder: 'Empty for a single day; "17 Haring" for the same year' },
+      { key: 'calendar', label: 'Calendar', kind: 'link', types: ['calendar'] },
       { key: 'era', label: 'Era', kind: 'text', placeholder: 'Age of Glass', suggest: true },
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Battle, wedding, exam, heist' },
       { key: 'participants', label: 'Involved', kind: 'links', types: ['character', 'organization', 'culture', 'species', 'creature'] },
-      { key: 'location', label: 'Where', kind: 'link', types: ['location'] },
+      { key: 'location', label: 'Where', kind: 'link', types: PLACES },
       { key: 'arcs', label: 'Plot arcs', kind: 'links', types: ['arc'] },
     ],
   },
@@ -497,12 +615,12 @@ const TYPES = {
       History: 'How it began, how it changed, and why it was forgotten, if it was.',
     },
     fields: [
-      { key: 'date', label: 'When', kind: 'text', placeholder: '1 Frostmoon, or last Moonday of Seedtime' },
+      { key: 'date', label: 'When', kind: 'holidayDates', placeholder: '1 Frostmoon, or last Moonday of Seedtime' },
       { key: 'days', label: 'Lasts (days)', kind: 'number', placeholder: '1' },
-      { key: 'first_held', label: 'First held', kind: 'text', placeholder: 'Year, if it began in your history' },
-      { key: 'last_held', label: 'Last held', kind: 'text', placeholder: 'Year, if it was abandoned or forgotten' },
+      { key: 'first_held', label: 'First held', kind: 'text', placeholder: 'Year, in any calendar, if it began in your history' },
+      { key: 'last_held', label: 'Last held', kind: 'text', placeholder: 'Year, in any calendar, if it was abandoned' },
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Festival, feast, holy day, remembrance' },
-      { key: 'kept_by', label: 'Kept by', kind: 'links', types: ['culture', 'organization', 'species', 'location'] },
+      { key: 'kept_by', label: 'Kept by', kind: 'links', types: ['culture', 'organization', 'species', 'nation', 'region', 'settlement', 'location'] },
       { key: 'commemorates', label: 'Commemorates', kind: 'link', types: ['event'] },
     ],
   },
@@ -525,7 +643,7 @@ const TYPES = {
       { key: 'parent', label: 'Descended from', kind: 'link', types: ['language'] },
       { group: 'Speakers', key: 'cultures', label: 'Spoken by', kind: 'links', types: ['culture'] },
       { group: 'Speakers', key: 'species', label: 'Species', kind: 'links', types: ['species'] },
-      { group: 'Speakers', key: 'regions', label: 'Spoken in', kind: 'links', types: ['location'] },
+      { group: 'Speakers', key: 'regions', label: 'Spoken in', kind: 'links', types: PLACES },
       { group: 'Speakers', key: 'speakers', label: 'Speakers', kind: 'text', placeholder: 'About 40,000, mostly elderly' },
       { group: 'Structure', key: 'word_order', label: 'Word order', kind: 'text', placeholder: 'SVO, VSO, free' },
       { group: 'Structure', key: 'script', label: 'Script', kind: 'text', placeholder: 'Runes, Latin, none (spoken only)' },
@@ -548,6 +666,13 @@ const TYPES = {
       { key: 'source_word', label: 'Original word', kind: 'text', placeholder: 'How it reads in the language it came from' },
       { key: 'register', label: 'Register', kind: 'text', suggest: true, placeholder: 'Formal, slang, archaic, ritual' },
       { key: 'aliases', label: 'Other forms', kind: 'list', placeholder: 'Plurals, conjugations' },
+    ],
+  },
+  calendar: {
+    label: 'Calendar', plural: 'Calendars', folder: 'Calendars', icon: 'calendar-range', color: 'yellow',
+    group: 'History', special: true, sections: [], details: [],
+    fields: [
+      { key: 'kept_by', label: 'Kept by', kind: 'links', types: ['culture', 'organization', 'species', 'nation', 'region', 'settlement', 'location'] },
     ],
   },
   note: {
@@ -583,9 +708,9 @@ const DEFAULT_SETTINGS = {
   yearZero: false,
   presentYears: {},
   calendars: {},
-  calendarView: { mode: 'year', show: {} },
+  calendarView: { mode: 'year', show: {}, cal: '', compare: '' },
   manuscript: { legalName: '', byline: '', contact: '', font: 'Times New Roman', lang: 'en' },
-  timeline: { births: true, foundings: true, calendar: true },
+  timeline: { births: true, foundings: true, calendar: true, cal: '' },
   web: {
     types: ['character', 'organization'],
     edges: {
@@ -880,6 +1005,8 @@ function numOrNull(v) {
    counting backwards (BC by default) come out negative. */
 function parseYear(v, negEras) {
   if (typeof v === 'number') return v;
+  /* A calendar's own year reader (it knows its ages and eras). */
+  if (typeof negEras === 'function') return negEras(v);
   const s = String(v || '');
   /* ISO dates from date properties: "2026-07-04" is 2026, not -4. */
   const iso = s.match(/^\s*(-?\d{1,6})-\d{1,2}-\d{1,2}(?!\d)/);
@@ -1181,22 +1308,38 @@ function shortNames(names) {
   return names.slice();
 }
 
-/* The world's calendar lives in a "Calendar" note in the project folder (type: calendar). With no note,
-   or with its switches off, the project uses the modern calendar and today's date.
-
-     custom_calendar   on: months, weekdays and moons come from the note's sections
-     custom_eras       on: backward_eras, forward_era and year_zero name the years
-     present           the world's "now"; empty means today (modern calendar, modern eras)
-
-   Sections, one item per line ("- " bullets and %%comments%% are fine):
-     ## Months            "Frostmoon, 30"
-     ## Weekdays          "Sunday" (the first is the weekday of the first day of year 1)
-     ## Moons             "Selune, 29.5, 0"  (cycle in days, days after year 1 began that it was new)
-     ## Months (from 1100), ## Weekdays (from 1100)   a calendar change; "Modern" switches back
-     ## History           holidays and dated notes:
-                            "Founders' Day: 3 Frostmoon (from 1012), a note"
-                            "Harvest Night: last Moonday of Seedtime"
-                            "1050: The Feast of Lanterns is forgotten."                                   */
+/* ------------------------------------------------------------------ */
+/* Calendars                                                           */
+/* ------------------------------------------------------------------ */
+/*
+ * A project can keep as many calendars as its cultures use. Each one is a note with `type: calendar`
+ * (the first lives at Lore/<Project>/Calendar.md, others in Lore/<Project>/Calendars/). With no note at all,
+ * the project uses the modern calendar and today's date.
+ *
+ * All calendars share one line of days. The primary calendar's first day of year 1 is day 0; every other
+ * calendar says where it sits on that line with `align: "1 Ember 1 = 14 Betula 1003 AD"` (any day in this
+ * calendar = the same day in another one). From there any date converts exactly into any other calendar.
+ *
+ * Frontmatter:
+ *   primary           true on the calendar plain dates are read in (and whose years the rest of Loresmith shows)
+ *   short             a short name to mark dates with: "Elven: 3 Ember 400" or "3 Ember 400 (Elven)"
+ *   custom_calendar   on: months, weekdays and moons come from the note's sections; off: the modern calendar
+ *   custom_eras       on: backward_eras, forward_era and year_zero name the years
+ *   align             where this calendar sits against another one (see above)
+ *   kept_by           cultures, organizations, species or places that use it
+ *   present           the world's "now" (read from the primary calendar); empty means today on a modern calendar
+ *
+ * Sections, one item per line ("- " bullets and %%comments%% are fine):
+ *   ## Months            "Frostmoon, 30", "Poa, 27, +1 every 4" (a leap day), "Leapmonth, 0, +30 every 3",
+ *                        "+1 every 4, except every 100, but every 400"; "Frostmoon/Frost, 30" adds a short form
+ *   ## Weekdays          "Sunday" (the first is the weekday of the first day of year 1)
+ *   ## Moons             "Selune, 29.5, 0"  (cycle in days, days after year 1 began that it was new)
+ *   ## Months (from 1100), ## Weekdays (from 1100)   a calendar change; "Modern" switches back
+ *   ## History           holidays and dated notes:
+ *                          "Founders' Day: 3 Frostmoon (from 1012), a note"
+ *                          "Harvest Night: last Moonday of Seedtime"
+ *                          "1050: The Feast of Lanterns is forgotten."
+ */
 const MODERN_MONTHS = [
   ['January', 31, ['Jan']], ['February', 28, ['Feb']], ['March', 31, ['Mar']], ['April', 30, ['Apr']],
   ['May', 31, []], ['June', 30, ['Jun']], ['July', 31, ['Jul']], ['August', 31, ['Aug']],
@@ -1206,6 +1349,8 @@ const MODERN_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
 /* Earth's moon: mean synodic month, and the new moon of 6 January 2000, 18:14 UTC, counted in days from 1 January, year 1. */
 const EARTH_MOON = { name: 'Moon', cycle: 29.530588853, offset: 730124.76 };
 const NTH_WORDS = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, fifth: 5, '5th': 5, last: -1 };
+/* Colors that tell calendars apart in the views: the primary first. */
+const CAL_COLORS = ['yellow', 'cyan', 'purple', 'green', 'orange', 'pink', 'blue', 'red'];
 
 /* Astronomical year (1 BC is 0) for a written year, so leap years and day counts line up. */
 function astroYear(y, zero) { return zero || y > 0 ? y : y + 1; }
@@ -1224,6 +1369,7 @@ function calLines(text) {
 function parseRange(s, neg) {
   const t = String(s || '').trim();
   let m;
+  if ((m = t.match(/^(?:from|since|after)\s+(.+?)\s+(?:until|till|to|through)\s+(.+)$/i))) return { from: parseYear(m[1], neg), to: /^(present|now|today)$/i.test(m[2].trim()) ? null : parseYear(m[2], neg) };
   if ((m = t.match(/^(?:from|since|after)\s+(.+)$/i))) return { from: parseYear(m[1], neg), to: null };
   if ((m = t.match(/^(?:until|till|to|before)\s+(.+)$/i))) return { from: null, to: parseYear(m[1], neg) };
   if ((m = t.match(/^(.*?\d[^–—]*?)\s*(?:[–—]|-(?=\s*(?:\d|$))|\bto\b)\s*(.*)$/i))) {
@@ -1243,39 +1389,401 @@ function parseDayRule(s) {
   if (m) return { kind: 'date', day: Number(m[2]), month: m[1].trim() };
   return null;
 }
+
+/* Leap rules, written after a month's length: "+1 every 4", "+1 every 4, except every 100, but every 400",
+   "leap 29 every 4", "+30 every 3" (a whole leap month on a 0-day month). Years are counted astronomically. */
+function parseLeapRule(text, base) {
+  const t = String(text || '');
+  const every = [...t.matchAll(/every\s+(\d+)/gi)].map((m) => Number(m[1])).filter((n) => n > 0);
+  if (!every.length) return null;
+  let add = 1;
+  let m;
+  if ((m = t.match(/[+]\s*(\d+)/))) add = Number(m[1]);
+  else if ((m = t.match(/(?:leap|becomes)\s+(\d+)/i))) add = Number(m[1]) - base;
+  if (!add) return null;
+  return { add, k: every[0], m: every[1] || 0, p: every[2] || 0 };
+}
+function leapIn(r, A) {
+  return mod(A, r.k) === 0 && !(r.m && mod(A, r.m) === 0 && !(r.p && mod(A, r.p) === 0));
+}
+/* Leap years in astronomical years [A, B). Exceptions are assumed to be multiples of the rule before them. */
+function leapCount(r, A, B) {
+  if (B <= A) return 0;
+  const c = (q) => (q ? Math.floor((B - 1) / q) - Math.floor((A - 1) / q) : 0);
+  return c(r.k) - c(r.m) + c(r.p);
+}
+function leapText(r) {
+  if (!r) return '';
+  return [`+${r.add} every ${r.k}`, r.m && `except every ${r.m}`, r.p && `but every ${r.p}`].filter(Boolean).join(', ');
+}
 function parseMonthLines(text) {
   const months = [];
   for (const l of calLines(text)) {
-    const [name, d] = l.split(',').map((x) => x.trim());
-    const days = Math.round(Number(d));
-    if (name && days > 0) months.push({ name, days, aliases: [] });
+    const parts = l.split(',').map((x) => x.trim());
+    const names = String(parts[0] || '').split('/').map((x) => x.trim()).filter(Boolean);
+    if (!names.length || !/\d/.test(parts[1] || '')) continue;
+    const days = Math.max(0, Math.round(Number(parts[1])) || 0);
+    const leap = parseLeapRule(parts.slice(2).join(', '), days);
+    if (days > 0 || leap) months.push({ name: names[0], aliases: names.slice(1), days, leap });
   }
   return months;
+}
+function monthLine(m) {
+  return [[m.name, ...(m.aliases || [])].join('/'), m.days, leapText(m.leap)].filter((x) => x !== '').join(', ');
 }
 function parseWeekdayLines(text) {
   return calLines(text).join(',').split(',').map((x) => x.trim()).filter(Boolean);
 }
 function isModernWord(text) { const l = calLines(text); return l.length === 1 && /^(modern|gregorian)$/i.test(l[0]); }
+function truthy(v) { return v === true || /^(true|yes|on|1)$/i.test(String(v == null ? '' : v).trim()); }
 
-/* Builds the calendar model from the note's frontmatter and body (or from old settings: see legacyCalSource). */
+function roman(n) {
+  if (!(n > 0 && n < 4000)) return String(n);
+  const t = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let out = '';
+  for (const [v, s] of t) while (n >= v) { out += s; n -= v; }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Eras                                                                */
+/* ------------------------------------------------------------------ */
+/*
+ * How a calendar numbers its years. One ordered list of eras covers everything: BC and AD, "-1195 Ancient" before
+ * "1:1 Divine", the Elder Scrolls' 1E to 4E, a single "TE" count that runs through 0 into negative numbers.
+ *
+ * Each era has a name, a short form, a length in years (blank: open-ended), and how its years are numbered:
+ *   up from N   the first year is N, then N+1… (AD: up from 1; an age: up from 1; a count with a year 0: up from 0)
+ *   up to N     the years count up and the last one is N (Ancient: up to -1, so -1195 Ancient … -1 Ancient)
+ *   down to N   the years count down and the last one is N (BC: down to 1, so 395 BC … 1 BC)
+ * The first "up from" era anchors the count: underneath, Loresmith numbers years the way that era does, and the eras
+ * before and after it are laid out from there. An open era before the anchor runs back forever; an open era at the
+ * end runs on forever. With `era_repeat`, eras of that length keep coming after the last one listed, numbered until
+ * they're named (Dragon Age's ages of 100 years).
+ *
+ * The note's ## Eras section, one era per line:
+ *   - Before Christ (BC/BCE), , down to 1
+ *   - Anno Domini (AD), , up from 1, "{short} {y}"
+ *   - Divine Age (Divine), 100, up from 1
+ * Patterns (per era, or era_format for all): {y} the year, {name}, {short}, {n} the era's number (the anchor is 1),
+ * {ord} "9th", {roman} "IX", {word} what eras are called (era_word: Age, Era).
+ */
+const ERA_FORMATS = [
+  ['{y} {short}', '1128 AD · -395 TE · 201 4E'],
+  ['{short} {y}', 'AD 1128 · 4E 201'],
+  ['{n}:{y} {short}', '9:41 Dragon'],
+  ['{y} {name}', '41 Dragon Age'],
+  ['Year {y} of the {name}', 'Year 41 of the Dragon Age'],
+  ['{y} {ord} {word}', '41 9th Age'],
+  ['{roman}.{y}', 'IX.41'],
+  ['{y}', '1128 (no name)'],
+];
+const ERA_MODES = [['up', 'Counts up from'], ['upTo', 'Counts up to'], ['down', 'Counts down to']];
+
+/* "Divine Age (Divine), 100, up from 1", "Ancient, , up to -1, \"{y} {short}\"", "?, 100" (an era not named yet). */
+function parseEraLines(text) {
+  const out = [];
+  for (let l of calLines(text)) {
+    let fmt = '';
+    const q = l.match(/,?\s*"([^"]*)"\s*$/);
+    if (q) { fmt = q[1]; l = l.slice(0, q.index); }
+    const parts = l.split(',').map((x) => x.trim());
+    let name = parts[0] || '';
+    let short = '';
+    const pm = name.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+    if (pm) { name = pm[1].trim(); short = pm[2].trim(); }
+    if (/^[?—-]*$/.test(name)) name = '';
+    let len = null, mode = 'up', num = 1;
+    for (const p of parts.slice(1)) {
+      let m;
+      if ((m = p.match(/^(\d+)\s*(?:years?)?$/i))) len = Math.max(1, Number(m[1]));
+      else if ((m = p.match(/(up\s+from|up\s+to|down\s+to|from|to)\s+(-?\d+)/i))) {
+        const k = m[1].toLowerCase().replace(/\s+/g, ' ');
+        mode = k === 'down to' ? 'down' : (k === 'up to' || k === 'to') ? 'upTo' : 'up';
+        num = Number(m[2]);
+      }
+    }
+    if (!name && !short && len == null && !parts.slice(1).some(Boolean) && !fmt) continue;
+    out.push({ name, short, len, mode, num, fmt });
+  }
+  return out;
+}
+function eraLine(e) {
+  const nm = (e.name || (e.short ? '' : '?')) + (e.short ? `${e.name ? ' ' : ''}(${e.short})` : '');
+  const mode = { up: 'up from', upTo: 'up to', down: 'down to' }[e.mode] || 'up from';
+  return [nm, e.len ? String(e.len) : '', `${mode} ${e.num}`].join(', ') + (e.fmt ? `, "${e.fmt}"` : '');
+}
+const eraFirst = (s) => String(s || '').split('/')[0].trim();
+
+class Eras {
+  constructor(list, opts = {}) {
+    this.list = list.length ? list : [{ name: '', short: '', len: null, mode: 'up', num: 1, fmt: '' }];
+    this.repeat = opts.repeat > 0 ? Math.round(opts.repeat) : null;
+    this.word = opts.word || 'Age';
+    this.fmt = opts.fmt || '';
+    this.zero = opts.zero !== false;
+    this.problems = [];
+    const L = this.list;
+    const n = L.length;
+    const st = new Array(n).fill(null), en = new Array(n).fill(null);
+    let a = L.findIndex((e) => e.mode === 'up');
+    this.anchor = a;
+    if (a >= 0) {
+      st[a] = L[a].num;
+      for (let i = a; i < n; i++) {
+        if (i > a) st[i] = en[i - 1] + 1;
+        en[i] = L[i].len ? st[i] + L[i].len - 1 : Infinity;
+        if (!L[i].len && i < n - 1) { this.problems.push(`${this.label(i)} has no length, so the eras after it never begin.`); break; }
+      }
+      for (let i = a - 1; i >= 0; i--) {
+        en[i] = st[i + 1] - 1;
+        st[i] = L[i].len ? en[i] - L[i].len + 1 : -Infinity;
+        if (!L[i].len && i > 0) { this.problems.push(`${this.label(i)} has no length, so the eras before it never happened.`); break; }
+      }
+    } else {
+      /* Nothing counts up: the last era ends just before year 1 of the underlying count. */
+      for (let i = n - 1; i >= 0; i--) {
+        en[i] = i === n - 1 ? 0 : st[i + 1] - 1;
+        st[i] = L[i].len ? en[i] - L[i].len + 1 : -Infinity;
+        if (!L[i].len && i > 0) break;
+      }
+    }
+    this.st = st;
+    this.en = en;
+    const sm = L.map((e) => eraFirst(e.short).match(/^(\d+)\s*(\D+)$/)).find(Boolean);
+    this.suffix = sm ? sm[2] : '';
+  }
+  /* The era's number, used by {n}: the anchor is 1, the one before it 0. */
+  numOf(i) { return i - (this.anchor >= 0 ? this.anchor : this.list.length) + 1; }
+  label(i) {
+    const e = this.list[i];
+    if (!e) return `${ordinal(this.numOf(i))} ${this.word}`;
+    return eraFirst(e.name) || eraFirst(e.short) || `${ordinal(this.numOf(i))} ${this.word}`;
+  }
+  /* The era a year (in the underlying count) falls in: { i, era, n, num, start, end, label }. */
+  at(y) {
+    const L = this.list;
+    for (let i = 0; i < L.length; i++) if (this.st[i] != null && y >= this.st[i] && y <= this.en[i]) return this.info(i, y);
+    const reach = L.map((_, i) => i).filter((i) => this.st[i] != null);
+    const lo = reach[0], hi = reach[reach.length - 1];
+    if (y < this.st[lo]) return this.info(lo, y);
+    if (this.repeat && Number.isFinite(this.en[hi])) {
+      const k = Math.floor((y - this.en[hi] - 1) / this.repeat);
+      const s = this.en[hi] + 1 + k * this.repeat;
+      return this.make(L.length + k, null, s, s + this.repeat - 1, y);
+    }
+    return this.info(hi, y);
+  }
+  info(i, y) { return this.make(i, this.list[i], this.st[i], this.en[i], y); }
+  make(i, e, start, end, y) {
+    const era = e || { name: '', short: this.suffix ? `${this.numOf(i)}${this.suffix}` : '', len: this.repeat, mode: 'up', num: 1, fmt: '' };
+    let num;
+    if (era.mode === 'up') { num = era.num + (y - start); if (!this.zero && era.num >= 1 && num <= 0) num -= 1; }
+    else if (era.mode === 'upTo') { num = era.num - (end - y); if (!this.zero && era.num <= -1 && num >= 0) num += 1; }
+    else num = era.num + (end - y);
+    return { i, era, synth: !e, n: this.numOf(i), num, start, end, label: e ? this.label(i) : eraFirst(era.short) || `${ordinal(this.numOf(i))} ${this.word}` };
+  }
+  /* Year (underlying count) for year `num` of era i, or null. */
+  yearOf(i, num) {
+    let e = this.list[i], start = this.st[i], end = this.en[i];
+    if (!e) {
+      const L = this.list;
+      const hi = L.map((_, k) => k).filter((k) => this.st[k] != null).pop();
+      if (!this.repeat || !Number.isFinite(this.en[hi]) || i < L.length) return null;
+      start = this.en[hi] + 1 + (i - L.length) * this.repeat;
+      return start + num - 1;
+    }
+    if (start == null) return null;
+    if (e.mode === 'up') { if (!this.zero && e.num >= 1 && num < 0) num += 1; return start + (num - e.num); }
+    if (e.mode === 'upTo') { if (!this.zero && e.num <= -1 && num > 0) num -= 1; return end - (e.num - num); }
+    return end - (num - e.num);
+  }
+  fmtOf(e) {
+    if (e.fmt) return e.fmt;
+    if (this.fmt) return this.fmt;
+    return eraFirst(e.short) || eraFirst(e.name) ? '{y} {short}' : '{y}';
+  }
+  format(y) {
+    const a = this.at(y);
+    const e = a.era;
+    const fmt = this.fmtOf(e);
+    const usesNum = /\{(n|ord|roman)\}/.test(fmt);
+    const unnamed = (v) => v || (usesNum ? '' : `${ordinal(a.n)} ${this.word}`);
+    const t = fmt.replace(/\{(\w+)\}/g, (m, k) => ({
+      y: a.num, n: a.n, ord: ordinal(a.n), roman: roman(a.n), word: this.word,
+      name: unnamed(eraFirst(e.name) || eraFirst(e.short)), short: unnamed(eraFirst(e.short) || eraFirst(e.name)), abbr: unnamed(eraFirst(e.short) || eraFirst(e.name)),
+    }[k] ?? m));
+    return t.replace(/\s+/g, ' ').replace(/\s+([,.:;)])/g, '$1').replace(/\(\s*\)/g, '').replace(/[\s,]+$/, '').trim();
+  }
+  /* Patterns that read years back: each era's own way of writing them, then common spellings. */
+  compile() {
+    const out = [];
+    const lit = (s) => s.split(/\s+/).filter(Boolean).map(reEsc).join('[\\s,]*');
+    const alt = (s) => { const l = String(s || '').split('/').map((x) => x.trim()).filter(Boolean); return l.length ? `(?:${l.sort((a, b) => b.length - a.length).map(reEsc).join('|')})` : null; };
+    const build = (fmt, toks, idx) => {
+      let ok = true, marker = false;
+      const keys = [];
+      const body = fmt.split(/(\{\w+\})/).map((seg) => {
+        const t = seg.match(/^\{(\w+)\}$/);
+        if (!t) {
+          if (seg.trim()) marker = true;
+          return seg.split(/(\s+)/).map((x) => (!x ? '' : /^\s+$/.test(x) ? '[\\s,]*' : reEsc(x))).join('');
+        }
+        const v = toks[t[1]];
+        if (v === undefined || v === null) { ok = false; return ''; }
+        if (t[1] !== 'y') marker = true;
+        const caps = (v.match(/\((?!\?)/g) || []).length;
+        for (let c = 0; c < caps; c++) keys.push(t[1]);
+        return v;
+      }).join('');
+      if (!ok || !marker || !keys.includes('y')) return null;
+      return { re: new RegExp('(?:^|[^\\p{L}\\d-])' + body + '(?![\\p{L}\\d])', 'iu'), i: idx, keys };
+    };
+    const Y = '(-?\\d+)';
+    this.list.forEach((e, i) => {
+      if (this.st[i] == null) return;
+      const n = this.numOf(i);
+      const toks = {
+        y: Y, n: String(n), ord: reEsc(ordinal(n)), roman: n >= 1 ? roman(n) : null, word: reEsc(this.word),
+        name: alt(e.name || e.short), short: alt(e.short || e.name), abbr: alt(e.short || e.name),
+      };
+      for (const f of [this.fmtOf(e), '{y} {short}', '{short} {y}', '{y} {name}', '{name} {y}', 'Year {y} of the {name}', '{n}:{y}', '{y} {ord} {word}']) {
+        const r = build(f, toks, i);
+        if (r) out.push(r);
+      }
+    });
+    if (this.repeat) {
+      const N = '(\\d+)';
+      const toks = { y: Y, n: N, ord: `${N}(?:st|nd|rd|th)`, roman: null, word: reEsc(this.word), name: null, short: this.suffix ? `${N}${reEsc(this.suffix)}` : null, abbr: null };
+      for (const f of [this.fmt || '{n}:{y}', '{n}:{y}', '{short} {y}', '{y} {short}', '{y} {ord} {word}', 'Year {y} of the {ord} {word}']) {
+        const r = build(f, toks, -1);
+        if (r) out.push(r);
+      }
+    }
+    return out;
+  }
+  /* Reads a year written with an era ("9:41 Dragon", "395 BC", "-1195 Ancient", "4E 201") -> the underlying year. */
+  parse(s) {
+    s = String(s || '');
+    if (!this._res) this._res = this.compile();
+    let best = null;
+    for (const r of this._res) {
+      const m = s.match(r.re);
+      if (!m) continue;
+      let i = r.i, num = null, n = null;
+      r.keys.forEach((k, j) => { const v = m[j + 1]; if (v == null) return; if (k === 'y') num = Number(v); else n = Number(v); });
+      if (num == null) continue;
+      if (i < 0) { if (n == null) continue; i = this.list.length + n - this.numOf(this.list.length); }
+      const y = this.yearOf(i, num);
+      if (y == null) continue;
+      const back = this.at(y);
+      if (back.i !== i || back.num !== num) continue;
+      if (!best || m[0].length > best.len) best = { y, len: m[0].length };
+    }
+    return best ? best.y : null;
+  }
+  /* A plain number, read in the anchor era's numbering. */
+  plain(num) {
+    const order = [this.anchor, ...this.list.map((_, i) => i)].filter((i) => i >= 0);
+    for (const i of order) {
+      const y = this.yearOf(i, num);
+      if (y == null) continue;
+      const a = this.at(y);
+      if (a.i === i && a.num === num) return y;
+    }
+    return this.anchor >= 0 ? this.yearOf(this.anchor, num) : num;
+  }
+  /* Names and short forms of every era, for telling calendars apart. */
+  labels() { return this.list.flatMap((e) => [...String(e.name || '').split('/'), ...String(e.short || '').split('/')]).map((x) => x.trim()).filter((x) => x.length > 1); }
+  /* Plain modern numbering: BC/BCE counting down, then plain years. */
+  get isDefault() {
+    const L = this.list;
+    return L.length === 2 && L[0].mode === 'down' && L[0].num === 1 && /^BC/.test(eraFirst(L[0].short || L[0].name)) && !L[0].len
+      && ['', '{y} {short}'].includes(L[0].fmt || '') && L[1].mode === 'up' && L[1].num === 1 && !L[1].short && !L[1].name && !L[1].fmt && !this.fmt && !this.repeat;
+  }
+}
+const DEFAULT_ERAS = () => [
+  { name: '', short: 'BC/BCE', len: null, mode: 'down', num: 1, fmt: '' },
+  { name: '', short: '', len: null, mode: 'up', num: 1, fmt: '' },
+];
+/* Ready-made ways of numbering years, for the calendar editor. */
+const ERA_PRESETS = {
+  bcad: { label: 'BC and AD', desc: '395 BC … 1 BC, then 1 AD, 2026 AD', eras: [{ name: 'Before Christ', short: 'BC/BCE', len: null, mode: 'down', num: 1, fmt: '' }, { name: 'Anno Domini', short: 'AD/CE', len: null, mode: 'up', num: 1, fmt: '' }] },
+  plain: { label: 'Plain years', desc: '395 BC, then plain numbers: 1128', eras: DEFAULT_ERAS() },
+  founding: { label: 'Before and after a founding', desc: '120 BF, then 1041 AF', eras: [{ name: 'Before the Founding', short: 'BF', len: null, mode: 'down', num: 1, fmt: '' }, { name: 'After the Founding', short: 'AF', len: null, mode: 'up', num: 1, fmt: '' }] },
+  signed: { label: 'One count, through zero', desc: '-395 YC, 0 YC, 1128 YC', eras: [{ name: '', short: 'YC', len: null, mode: 'up', num: 1, fmt: '' }], zero: true },
+  ages: { label: 'Numbered ages of equal length', desc: '-1195 Old, then 1:1 First … 9:41 Ninth', repeat: 100, fmt: '{n}:{y} {short}', eras: [
+    { name: 'Old Era', short: 'Old', len: null, mode: 'upTo', num: -1, fmt: '{y} {short}' },
+    ...['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth'].map((n) => ({ name: `${n} Age`, short: n, len: 100, mode: 'up', num: 1, fmt: '' })),
+  ] },
+  eras: { label: 'Eras of different lengths', desc: '1E 2920, 2E 896, 3E 433, then 4E 201', word: 'Era', eras: [
+    { name: 'Before the Eras', short: 'BE', len: null, mode: 'down', num: 1, fmt: '' },
+    { name: 'First Era', short: '1E', len: 2920, mode: 'up', num: 1, fmt: '{short} {y}' },
+    { name: 'Second Era', short: '2E', len: 896, mode: 'up', num: 1, fmt: '{short} {y}' },
+    { name: 'Third Era', short: '3E', len: 433, mode: 'up', num: 1, fmt: '{short} {y}' },
+    { name: 'Fourth Era', short: '4E', len: null, mode: 'up', num: 1, fmt: '{short} {y}' },
+  ] },
+};
+/* Eras from properties and sections of older versions: custom_eras / backward_eras / forward_era, and ## Ages. */
+function legacyEras(fm, sections) {
+  const custom = truthy(fm.custom_eras);
+  const neg = custom ? String(fm.backward_eras == null ? 'BC, BCE' : fm.backward_eras).split(',').map((s) => s.trim()).filter(Boolean) : ['BC', 'BCE'];
+  const negative = custom && /^neg/i.test(String(fm.backward_style || ''));
+  const before = (k) => /^before/i.test(String(fm[k] || ''));
+  const backShort = (neg.length ? neg : negative ? [] : ['BC']).join('/');
+  const back = { name: eraFirst(backShort), short: backShort, len: null, mode: negative ? 'upTo' : 'down', num: negative ? -1 : 1, fmt: before('backward_position') ? '{short} {y}' : backShort ? '{y} {short}' : '{y}' };
+  const ageSec = sections.find((s) => /^ages\s*$/i.test(s.name.trim()));
+  const ages = [];
+  if (ageSec) {
+    for (const l of calLines(ageSec.lines.join('\n'))) {
+      const p = l.split(',').map((x) => x.trim());
+      ages.push({ name: /^[?—-]*$/.test(p[0] || '') ? '' : p[0], len: /\d/.test(p[1] || '') ? Number(p[1]) : null, abbr: p[2] || '' });
+    }
+  }
+  if (ages.length) {
+    const word = fm.age_word ? String(fm.age_word) : 'Age';
+    const eras = [back, ...ages.map((a) => ({
+      name: a.name ? (new RegExp(`\\b${reEsc(word)}\\b`, 'i').test(a.name) ? a.name : `${a.name} ${word}`) : '',
+      short: a.abbr || a.name, len: a.len || (fm.age_length ? Number(fm.age_length) : null), mode: 'up', num: 1, fmt: '',
+    }))];
+    const lf = fm.age_format ? String(fm.age_format).replace(/\{name\}/g, '{short}').replace(/\{abbr\}/g, '{short}') : '';
+    return { eras, repeat: numOrNull(fm.age_length), fmt: lf || (ages.every((a) => a.abbr) ? '{short} {y}' : fm.age_length ? '{n}:{y} {short}' : '{y} {short}'), word, zero: true };
+  }
+  const fwd = custom ? String(fm.forward_era || '').trim() : '';
+  const zero = custom && truthy(fm.year_zero);
+  const ahead = { name: '', short: fwd, len: null, mode: 'up', num: zero ? 0 : 1, fmt: before('forward_position') ? '{short} {y}' : '' };
+  return { eras: [back, ahead], repeat: null, fmt: '', word: 'Age', zero: true };
+}
+
+/* Builds a calendar's model from its note's frontmatter and body (or from old settings: see legacyCalSource). */
 function buildCalModel(fm, body, path) {
   fm = fm || {};
-  const truthy = (v) => v === true || /^(true|yes|on|1)$/i.test(String(v || '').trim());
-  const customEras = truthy(fm.custom_eras);
-  const eras = customEras
-    ? {
-      custom: true,
-      neg: String(fm.backward_eras == null ? 'BC, BCE' : fm.backward_eras).split(',').map((s) => s.trim()).filter(Boolean),
-      fwd: String(fm.forward_era || '').trim(),
-      zero: truthy(fm.year_zero),
-    }
-    : { custom: false, neg: ['BC', 'BCE'], fwd: '', zero: false };
-  const custom = truthy(fm.custom_calendar);
-  const neg = eras.neg;
+  const sections = parseSections(body || '').sections;
+  /* Eras: the ## Eras section, or the properties and ## Ages section of older versions. */
+  const eraSec = sections.find((s) => /^eras\s*$/i.test(s.name.trim()));
+  const eraList = eraSec ? parseEraLines(eraSec.lines.join('\n')) : [];
+  const src = eraList.length
+    ? { eras: eraList, repeat: numOrNull(fm.era_repeat), fmt: fm.era_format ? String(fm.era_format) : '', word: fm.era_word ? String(fm.era_word) : '', zero: !truthy(fm.no_year_zero) }
+    : legacyEras(fm, sections);
+  const eras = new Eras(src.eras, src);
+  eras.custom = !eras.isDefault;
+  /* Reads a year in this calendar: a year written with an era, else a plain number in the main era's numbering. */
+  const yp = (v) => {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? eras.plain(v) : null;
+    const s = String(v);
+    const iso = s.match(/^\s*(-?\d{1,6})-\d{1,2}-\d{1,2}(?!\d)/);
+    if (iso) return eras.plain(Number(iso[1]));
+    const e = eras.parse(s);
+    if (e != null) return e;
+    const nums = s.match(/-?\d+/g);
+    return nums ? eras.plain(Number(nums[nums.length - 1])) : null;
+  };
+  const neg = yp;
 
   /* Sections, with an optional "(from 1100)" range in the heading. */
   const secs = { months: [], weekdays: [], moons: [], history: [] };
-  for (const s of parseSections(body || '').sections) {
+  for (const s of sections) {
     const m = s.name.match(/^(months|weekdays|moons|history|holidays)\s*(?:\((.*)\))?\s*$/i);
     if (!m) continue;
     const key = m[1].toLowerCase() === 'holidays' ? 'history' : m[1].toLowerCase();
@@ -1283,66 +1791,75 @@ function buildCalModel(fm, body, path) {
     secs[key].push({ from, text: s.lines.join('\n') });
   }
   const undated = (k) => secs[k].filter((s) => s.from == null).map((s) => s.text).join('\n');
+  const baseMonths = parseMonthLines(undated('months'));
+  /* A calendar note with months written in it, and the switch never set, is a custom calendar. */
+  const custom = fm.custom_calendar == null || String(fm.custom_calendar).trim() === '' ? baseMonths.length > 0 : truthy(fm.custom_calendar);
+  const out = {
+    path, custom, eras, yp, monthSets: [], weekSets: [], moons: [], holidays: [], notes: [],
+    present: fm.present != null && String(fm.present).trim() !== '' ? fm.present : null,
+    primary: truthy(fm.primary), short: String(fm.short || '').trim(), aliases: toArr(fm.aliases).map((x) => x.trim()).filter(Boolean),
+    /* The year can begin partway through the months: new_year "1 June"; numbered by the year it begins in, or ends in. */
+    newYear: fm.new_year != null && String(fm.new_year).trim() ? String(fm.new_year).trim() : '',
+    newYearByEnd: /^end/i.test(String(fm.new_year_numbering || '')),
+    /* The week runs in step with another calendar's: the same weekday on the same day. */
+    weekLike: linkText(String(fm.week_like || '')).trim(),
+    useFrom: fm.in_use_from != null && String(fm.in_use_from).trim() ? String(fm.in_use_from) : '',
+    useUntil: fm.in_use_until != null && String(fm.in_use_until).trim() ? String(fm.in_use_until) : '',
+    align: toArr(fm.align)[0] || '', epochDays: numOrNull(fm.epoch_day), keptBy: toArr(fm.kept_by),
+    color: COLORS.includes(String(fm.color)) ? String(fm.color) : '',
+  };
 
   /* Month sets: the base calendar, then each dated change. */
-  const monthSets = [];
   if (custom) {
-    const months = parseMonthLines(undated('months'));
-    if (!months.length) return { path, custom, eras, broken: 'no-months', monthSets: [], weekSets: [], moons: [], holidays: [], notes: [], present: fm.present };
-    monthSets.push({ from: -Infinity, modern: false, months });
-  } else monthSets.push({ from: -Infinity, modern: true });
+    if (!baseMonths.length) out.broken = 'no-months';
+    out.monthSets.push({ from: -Infinity, modern: !baseMonths.length, months: baseMonths });
+  } else out.monthSets.push({ from: -Infinity, modern: true });
   for (const s of secs.months.filter((x) => x.from != null)) {
-    if (isModernWord(s.text)) monthSets.push({ from: s.from, modern: true });
+    if (isModernWord(s.text)) out.monthSets.push({ from: s.from, modern: true });
     else {
       const months = parseMonthLines(s.text);
-      if (months.length) monthSets.push({ from: s.from, modern: false, months });
+      if (months.length) out.monthSets.push({ from: s.from, modern: false, months });
     }
   }
-  monthSets.sort((a, b) => a.from - b.from);
-  for (const set of monthSets) set.yearDays = set.modern ? 365.2425 : set.months.reduce((n, m) => n + m.days, 0);
+  out.monthSets.sort((a, b) => a.from - b.from);
 
   /* Weekday sets. The base modern week makes 1 January, year 1 a Monday; a dated week starts on the first day of its year. */
-  const weekSets = [];
-  if (custom) {
+  if (custom && baseMonths.length) {
     const list = parseWeekdayLines(undated('weekdays'));
-    if (list.length) weekSets.push({ from: -Infinity, list, base: 0 });
-  } else weekSets.push({ from: -Infinity, list: MODERN_WEEKDAYS, base: -1 });
+    if (list.length) out.weekSets.push({ from: -Infinity, list, base: 0 });
+  } else out.weekSets.push({ from: -Infinity, list: MODERN_WEEKDAYS, base: -1 });
   for (const s of secs.weekdays.filter((x) => x.from != null)) {
     const list = isModernWord(s.text) ? MODERN_WEEKDAYS : parseWeekdayLines(s.text);
-    if (list.length) weekSets.push({ from: s.from, list, base: null });
+    if (list.length) out.weekSets.push({ from: s.from, list, base: null });
   }
-  weekSets.sort((a, b) => a.from - b.from);
+  out.weekSets.sort((a, b) => a.from - b.from);
 
-  const moons = [];
   for (const l of calLines(undated('moons'))) {
     const [name, c, o] = l.split(',').map((x) => x.trim());
     const cycle = Number(c);
-    if (name && cycle > 0) moons.push({ name, cycle, offset: Number(o) || 0 });
+    if (name && cycle > 0) out.moons.push({ name, cycle, offset: Number(o) || 0 });
   }
-  if (!moons.length && monthSets.some((s) => s.modern)) moons.push(EARTH_MOON);
+  if (!out.moons.length && out.monthSets.some((s) => s.modern) && !out.broken) out.moons.push(Object.assign({ earth: true }, EARTH_MOON));
 
   /* History: holidays (with optional years) and dated notes. */
   const monthNames = new Set();
-  for (const set of monthSets) {
-    for (const [n, , al] of set.modern ? MODERN_MONTHS : set.months.map((m) => [m.name, 0, []])) {
+  for (const set of out.monthSets) {
+    for (const [n, , al] of set.modern ? MODERN_MONTHS : set.months.map((m) => [m.name, 0, m.aliases || []])) {
       monthNames.add(n.toLowerCase());
       for (const a of al) monthNames.add(a.toLowerCase());
     }
   }
-  const holidays = [];
-  const notes = [];
   for (const sec of secs.history) {
     for (const line of calLines(sec.text)) {
       const h = parseHistoryLine(line, neg, monthNames);
       if (!h) continue;
       if (h.kind === 'holiday') {
         if (h.from == null && sec.from != null) h.from = sec.from;
-        holidays.push(h);
-      } else notes.push(h);
+        out.holidays.push(h);
+      } else out.notes.push(h);
     }
   }
-  const present = fm.present != null && String(fm.present).trim() !== '' ? fm.present : null;
-  return { path, custom, eras, monthSets, weekSets, moons, holidays, notes, present };
+  return out;
 }
 
 /* One line of the History section -> a holiday or a dated note (or null). */
@@ -1372,32 +1889,420 @@ function parseHistoryLine(line, neg, monthNames) {
   return null;
 }
 
+/* One calendar: its months and weeks (which can change over its history), eras, holidays, and where it sits on
+   the world's shared line of days (epoch: the shared day its year 1 begins on). Days are counted from 0, the first
+   day of year 1; day-of-year is 1-based. */
+class Cal {
+  constructor(model, opts = {}) {
+    this.model = model;
+    this.id = opts.id;
+    this.name = opts.name || 'Calendar';
+    this.file = opts.file || null;
+    this.color = model.color || 'yellow';
+    this.eras = model.eras;
+    /* Years are one continuous count (…, -1, 0, 1, …); the eras decide how each is written. */
+    this.zero = true;
+    this.yp = model.yp;
+    this.short = model.short || '';
+    this.aliases = model.aliases || [];
+    this.broken = model.broken || null;
+    this.monthSets = model.monthSets.length ? model.monthSets : [{ from: -Infinity, modern: true }];
+    this.weekSets = model.weekSets;
+    this.moons = model.moons;
+    this.notes = model.notes || [];
+    this.holidays = (model.holidays || []).map((h) => Object.assign({}, h, { cal: this }));
+    this.epoch = 0;
+    /* New Year partway through the months. Internally years still run from the first month (the "base" year), so day
+       counts, leap days, weekdays and holidays don't change; only the year a date is numbered in moves. */
+    this.ny = null;
+    const nyr = parseDayRule(model.newYear || '');
+    if (nyr && nyr.kind === 'date') this.ny = { month: nyr.month.toLowerCase().replace(/\.$/, ''), day: nyr.day, byEnd: !!model.newYearByEnd, text: model.newYear };
+    this._db = new Map();
+    this._years = new Map();
+    for (const s of this.monthSets) {
+      s.fromA = s.from === -Infinity ? -Infinity : astroYear(s.from, this.zero);
+      if (s.modern) { s.base = 365; s.avg = 365.2425; }
+      else {
+        s.base = s.months.reduce((n, m) => n + m.days, 0);
+        s.avg = s.base + s.months.reduce((n, m) => n + (m.leap ? m.leap.add * (1 / m.leap.k - (m.leap.m ? 1 / m.leap.m : 0) + (m.leap.p ? 1 / m.leap.p : 0)) : 0), 0);
+        if (s.avg <= 0) { s.modern = true; s.base = 365; s.avg = 365.2425; this.broken = this.broken || 'no-days'; }
+      }
+    }
+    for (const w of this.weekSets) w.fromA = w.from === -Infinity ? -Infinity : astroYear(w.from, this.zero);
+  }
+
+  get modern() { return !!this.monthSets[0].modern && !this.broken; }
+  /* Names a date can be marked with: "Elven: 3 Ember" or "3 Ember (Elven)". */
+  keys() {
+    if (!this._keys) this._keys = [...new Set([this.name, this.short, ...this.aliases, this.file && this.file.basename].filter(Boolean))].sort((a, b) => b.length - a.length);
+    return this._keys;
+  }
+  label() { return this.short || this.name; }
+  /* "the Elven calendar", or just "World Calendar" when the name already says calendar. */
+  the() { return /calendar|reckoning|count/i.test(this.name) ? `the ${this.name}` : `the ${this.name} calendar`; }
+
+  astro(y) { return astroYear(y, this.zero); }
+  unastro(a) { return this.zero || a > 0 ? a : a - 1; }
+  next(y) { return this.unastro(this.astro(y) + 1); }
+  prev(y) { return this.unastro(this.astro(y) - 1); }
+  /* Whole years from year a to year b. Without a year 0, 1 BC to 1 AC is one year, not two. */
+  yearsBetween(a, b) { return this.astro(b) - this.astro(a); }
+  fmtYear(y) { return y == null ? '' : this.eras.format(y); }
+  /* The era a year falls in: { i, n, num, start, end, label, len }. */
+  ageOf(y) {
+    const a = this.eras.at(y);
+    return Object.assign(a, { y: a.num, len: Number.isFinite(a.end) && Number.isFinite(a.start) ? a.end - a.start + 1 : Infinity });
+  }
+
+  segAt(A) { let seg = this.monthSets[0]; for (const s of this.monthSets) if (s.fromA <= A) seg = s; return seg; }
+  spanSeg(seg, A, B) {
+    if (B <= A) return 0;
+    if (seg.modern) return gregDaysBefore(B) - gregDaysBefore(A);
+    let n = (B - A) * seg.base;
+    for (const m of seg.months) if (m.leap) n += m.leap.add * leapCount(m.leap, A, B);
+    return n;
+  }
+  between(A, B) {
+    let t = 0;
+    const segs = this.monthSets;
+    segs.forEach((s, i) => {
+      const lo = Math.max(A, s.fromA);
+      const hi = Math.min(B, i + 1 < segs.length ? segs[i + 1].fromA : Infinity);
+      if (lo < hi) t += this.spanSeg(s, lo, hi);
+    });
+    return t;
+  }
+  /* Days from the first day of astronomical year 1 to the first day of astronomical year A. */
+  dbA(A) {
+    let n = this._db.get(A);
+    if (n === undefined) {
+      n = A >= 1 ? this.between(1, A) : -this.between(A, 1);
+      if (this._db.size > 20000) this._db.clear();
+      this._db.set(A, n);
+    }
+    return n;
+  }
+  daysBefore(y) { return this.dbA(this.astro(y)); }
+  toDay(y, d) { return this.daysBefore(y) + (d == null ? 1 : d) - 1; }
+  /* Day number -> { y, d } in this calendar. */
+  fromDay(n) {
+    n = Math.floor(n);
+    let seg = this.monthSets[0];
+    for (const s of this.monthSets) if (s.fromA !== -Infinity && this.dbA(s.fromA) <= n) seg = s;
+    const baseA = seg.fromA === -Infinity ? 1 : seg.fromA;
+    let A = baseA + Math.floor((n - this.dbA(baseA)) / seg.avg);
+    for (let i = 0; this.dbA(A) > n && i < 5000; i++) A--;
+    for (let i = 0; this.dbA(A + 1) <= n && i < 5000; i++) A++;
+    return { y: this.unastro(A), d: n - this.dbA(A) + 1 };
+  }
+
+  /* Year y as it runs in this calendar: { months, byLength, yearDays, modern, leap, weekdays, wdBase }. */
+  year(y) {
+    let yr = this._years.get(y);
+    if (yr) return yr;
+    const A = this.astro(y);
+    const seg = this.segAt(A);
+    const src = seg.modern
+      ? MODERN_MONTHS.map(([name, days, aliases], i) => ({ name, aliases, days: i === 1 && isLeapYear(A) ? 29 : days }))
+      : seg.months.map((m) => ({ name: m.name, aliases: m.aliases || [], days: m.days + (m.leap && leapIn(m.leap, A) ? m.leap.add : 0) }));
+    const months = [];
+    let start = 0;
+    for (const m of src) {
+      if (m.days <= 0) continue;
+      months.push({ name: m.name, aliases: m.aliases, days: m.days, start, index: months.length });
+      start += m.days;
+    }
+    const byLength = [];
+    for (const m of months) for (const name of [m.name, ...m.aliases]) {
+      const esc = reEsc(name);
+      byLength.push({
+        name, m,
+        before: new RegExp('(\\d+)(?:st|nd|rd|th)?\\s+(?:of\\s+)?' + esc + '\\.?(?![\\p{L}])', 'iu'),
+        /* "July 4, 2026", "July 4th", "July 4 2026". No lookbehind: older iPad Safari can't compile it. */
+        after: new RegExp('(?:^|[^\\p{L}])' + esc + '\\.?\\s+(\\d{1,3})(?!\\d)(?:st|nd|rd|th)?(?=\\s*,|\\s+\\d|\\s*$|\\s+\\p{L})', 'iu'),
+        any: new RegExp('(?:^|[^\\p{L}])' + esc + '(?![\\p{L}])', 'iu'),
+      });
+    }
+    byLength.sort((a, b) => b.name.length - a.name.length);
+    let ws = null;
+    for (const s of this.weekSets) if (s.fromA <= A) ws = s;
+    yr = {
+      y, months, byLength, yearDays: start, modern: !!seg.modern, leap: !seg.modern ? start > seg.base : isLeapYear(A),
+      weekdays: ws ? ws.list : [],
+      wdBase: ws ? (ws.base != null ? ws.base : this.dbA(ws.fromA)) : 0,
+      holidays: null,
+    };
+    if (this._years.size > 4000) this._years.clear();
+    this._years.set(y, yr);
+    return yr;
+  }
+  monthAt(y, d) {
+    const yr = this.year(y);
+    return yr.months.find((x) => d > x.start && d <= x.start + x.days) || yr.months[yr.months.length - 1];
+  }
+  weekdayIndex(y, d) {
+    const yr = this.year(y);
+    if (!yr.weekdays.length || d == null) return -1;
+    return mod(this.toDay(y, d) - yr.wdBase, yr.weekdays.length);
+  }
+  weekday(y, d) {
+    const i = this.weekdayIndex(y, d);
+    return i < 0 ? null : this.year(y).weekdays[i];
+  }
+  /* Day of the base year y on which the numbered year begins (1 without a New Year setting, or if its month is
+     missing that year). */
+  nyDoy(y) {
+    if (!this.ny) return 1;
+    const m = this.year(y).months.find((x) => x.name.toLowerCase() === this.ny.month || x.aliases.some((a) => a.toLowerCase() === this.ny.month));
+    return m ? m.start + Math.min(Math.max(this.ny.day, 1), m.days) : 1;
+  }
+  /* The year a day is numbered in. Base year y, day d (null: the year as a whole). */
+  numY(y, d) {
+    if (!this.ny) return y;
+    const before = d != null && d < this.nyDoy(y);
+    if (this.ny.byEnd) return before ? y : this.next(y);
+    return before ? this.prev(y) : y;
+  }
+  /* The base year that numbered year Y begins in. */
+  baseOfNum(Y) { return !this.ny ? Y : this.ny.byEnd ? this.prev(Y) : Y; }
+  /* Base year for day `doy` (read from year Y's months) of numbered year Y. */
+  baseFor(Y, s) {
+    if (!this.ny) return Y;
+    const B = this.baseOfNum(Y);
+    const day = this.dayOfYear(s, B);
+    if (!day || day.monthOnly) return B;
+    return day.doy >= this.nyDoy(B) ? B : this.next(B);
+  }
+  /* "1128 AD", or the year as it's numbered on day d. */
+  yearText(y, d) { return this.fmtYear(this.numY(y, d)); }
+  /* "6 October 2026", "3 Ember, 400 EK" */
+  dateText(pt) {
+    if (!pt) return '';
+    if (pt.d == null) return this.fmtYear(this.numY(pt.y, null));
+    const yr = this.year(pt.y);
+    const m = this.monthAt(pt.y, pt.d);
+    return `${pt.d - m.start} ${m.name}${yr.modern && !this.eras.custom ? ' ' : ', '}${this.yearText(pt.y, pt.d)}`;
+  }
+  /* "3 Ember" */
+  dayText(y, d) {
+    const m = this.monthAt(y, d);
+    return `${d - m.start} ${m.name}`;
+  }
+
+  /* Finds "12 Frostmoon", "Frostmoon 12, ...", "July 4th" or "2026-07-04" in a date: { doy, month, day, monthOnly }. */
+  dayOfYear(s, y) {
+    if (s == null || y == null) return null;
+    s = String(s);
+    const yr = this.year(y);
+    const iso = s.match(/^\s*-?\d{1,6}-(\d{1,2})-(\d{1,2})(?!\d)/);
+    if (iso) {
+      const m = yr.months[Number(iso[1]) - 1];
+      if (m) { const day = Math.min(Math.max(Number(iso[2]), 1), m.days); return { doy: m.start + day, month: m.index, day, monthOnly: false }; }
+    }
+    for (const e of yr.byLength) {
+      const hit = s.match(e.before) || s.match(e.after);
+      if (!hit && !e.any.test(s)) continue;
+      const m = e.m;
+      const day = hit ? Math.min(Math.max(Number(hit[1]), 1), m.days) : 1;
+      return { doy: m.start + day, month: m.index, day, monthOnly: !hit };
+    }
+    return null;
+  }
+  /* A point in this calendar: { y, d (day of year or null), raw, cal }. */
+  parse(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? { y: this.baseOfNum(v), d: null, raw: this.fmtYear(v), cal: this } : null;
+    if (v instanceof Date) v = isNaN(v) ? '' : v.toISOString().slice(0, 10);
+    const s = String(v).trim();
+    const Y = this.yp(s);
+    if (Y == null) return null;
+    /* The year written is the numbered year; ISO dates are always in plain (base) years. */
+    const y = /^\s*-?\d{1,6}-\d{1,2}-\d{1,2}(?!\d)/.test(s) ? Y : this.baseFor(Y, s);
+    const day = this.dayOfYear(s, y);
+    return { y, d: day && !day.monthOnly ? day.doy : null, raw: s, cal: this };
+  }
+  /* Does this text use one of this calendar's month names, or (with custom eras) one of its eras? */
+  monthRe() {
+    if (this._monthRe === undefined) {
+      const names = new Set();
+      for (const s of this.monthSets) {
+        for (const [n, , al] of s.modern ? MODERN_MONTHS : s.months.map((m) => [m.name, 0, m.aliases || []])) {
+          names.add(n);
+          for (const a of al) names.add(a);
+        }
+      }
+      const list = [...names].sort((a, b) => b.length - a.length).map(reEsc);
+      this._monthRe = list.length ? new RegExp('(?:^|[^\\p{L}])(?:' + list.join('|') + ')\\.?(?![\\p{L}])', 'iu') : null;
+    }
+    return this._monthRe;
+  }
+  eraRe() {
+    if (this._eraRe === undefined) {
+      const list = (this.eras.custom ? this.eras.labels() : []).sort((a, b) => b.length - a.length).map(reEsc);
+      this._eraRe = list.length ? new RegExp('(?:^|[^\\p{L}])(?:' + list.join('|') + ')(?![\\p{L}])', 'iu') : null;
+    }
+    return this._eraRe;
+  }
+
+  /* Day of the year a holiday falls on in year y, or null if it isn't held that year or its date can't be read. */
+  holidayDay(h, y) {
+    if (h.from != null && this.astro(y) < this.astro(h.from)) return null;
+    if (h.to != null && this.astro(y) >= this.astro(h.to)) return null;
+    const yr = this.year(y);
+    const k = h.rule.month.toLowerCase().replace(/\.$/, '');
+    const m = yr.months.find((x) => x.name.toLowerCase() === k || x.aliases.some((a) => a.toLowerCase() === k));
+    if (!m) return null;
+    const ok = (doy) => {
+      if (doy == null || (h.fromG == null && h.toG == null)) return doy;
+      const g = this.epoch + this.toDay(y, doy);
+      return (h.fromG != null && g < h.fromG) || (h.toG != null && g > h.toG) ? null : doy;
+    };
+    if (h.rule.kind === 'date') return ok(h.rule.day >= 1 && h.rule.day <= m.days ? m.start + h.rule.day : null);
+    if (!yr.weekdays.length) return null;
+    const want = yr.weekdays.findIndex((w) => w.toLowerCase() === h.rule.weekday.toLowerCase());
+    if (want < 0) return null;
+    const len = yr.weekdays.length;
+    const firstWd = mod(this.daysBefore(y) + m.start - yr.wdBase, len);
+    const first = 1 + mod(want - firstWd, len);
+    const day = h.rule.n > 0 ? first + (h.rule.n - 1) * len : first + Math.floor((m.days - first) / len) * len;
+    return ok(day <= m.days ? m.start + day : null);
+  }
+  /* Every holiday kept in year y, one entry per day (a three-day festival has three). */
+  yearHolidays(y) {
+    const yr = this.year(y);
+    if (yr.holidays) return yr.holidays;
+    const out = [];
+    for (const h of this.holidays) {
+      const doy = this.holidayDay(h, y);
+      if (doy == null) continue;
+      const days = h.days || 1;
+      for (let i = 0; i < days && doy + i <= yr.yearDays; i++) {
+        const m = yr.months.find((x) => doy + i > x.start && doy + i <= x.start + x.days);
+        out.push({
+          month: m.index, day: doy + i - m.start, y,
+          name: i ? `${h.name} (day ${i + 1})` : h.name, base: h.name, note: h.note, doy: doy + i, part: i + 1, of: days,
+          from: h.from, to: h.to, lastHeld: h.lastHeld, file: h.file || null, cal: this, obs: h.obs || 0, ruleText: h.ruleText,
+        });
+      }
+    }
+    yr.holidays = out;
+    return out;
+  }
+  /* The next time a holiday is held, on or after `from` (a point in this calendar), looking up to 400 years ahead. */
+  nextHoliday(h, from) {
+    for (let y = from.y, i = 0; i < 400; i++, y = this.next(y)) {
+      if (h.to != null && this.astro(y) >= this.astro(h.to)) return null;
+      if (h.toG != null && this.epoch + this.daysBefore(y) > h.toG) return null;
+      const d = this.holidayDay(h, y);
+      if (d != null && (y !== from.y || from.d == null || d >= from.d)) return { y, d, cal: this };
+    }
+    return null;
+  }
+}
+
+/* The same holiday kept on two calendars can land on the same day: show it once (keeping the first). */
+function dedupeHolidays(list) {
+  const seen = new Set();
+  return list.filter((h) => {
+    const k = `${h.file ? h.file.path : h.cal.id + ':' + h.base}#${h.part || 1}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+/* Which calendar a date is written in. Checked in order: a calendar named before or after it ("Elven: 3 Ember 400",
+   "3 Ember 400 (Elven)", "[[Elven Reckoning]]: ..."), an ISO date (a modern calendar), an era that belongs to one
+   calendar, month names, then the hint (the entry's own calendar), then the primary calendar. */
+function detectCal(world, text, hint) {
+  const s = String(text == null ? '' : text).trim();
+  const cals = world.cals;
+  for (const c of cals) {
+    for (const k of c.keys()) {
+      const e = reEsc(k);
+      const pre = new RegExp('^(?:\\[\\[' + e + '(?:\\|[^\\]]*)?\\]\\]\\s*:?|' + e + '\\s*:)\\s*', 'i');
+      if (pre.test(s)) return { cal: c, text: s.replace(pre, ''), marked: true };
+      const suf = new RegExp('\\s*\\(\\s*(?:\\[\\[)?' + e + '(?:\\]\\])?\\s*\\)\\s*$', 'i');
+      if (suf.test(s)) return { cal: c, text: s.replace(suf, ''), marked: true };
+    }
+  }
+  if (cals.length === 1) return { cal: cals[0], text: s };
+  const pick = (list) => (hint && list.includes(hint) ? hint : list.includes(world.primary) ? world.primary : list[0]);
+  if (/^\s*-?\d{1,6}-\d{1,2}-\d{1,2}(?!\d)/.test(s)) {
+    const mods = cals.filter((c) => c.modern);
+    if (mods.length) return { cal: pick(mods), text: s };
+  }
+  const eraHits = cals.filter((c) => c.eraRe() && c.eraRe().test(s));
+  if (eraHits.length) return { cal: pick(eraHits), text: s };
+  const monthHits = cals.filter((c) => c.monthRe() && c.monthRe().test(s));
+  if (monthHits.length) return { cal: pick(monthHits), text: s };
+  return { cal: hint || world.primary, text: s };
+}
+
+/* Ready-made calendars for "New calendar". Each gives frontmatter and the base sections. */
+const CAL_TEMPLATES = {
+  blank: {
+    label: 'Blank custom calendar', desc: 'Your own months, weekdays and moons, starting empty.',
+    fm: { custom_calendar: true, custom_eras: false }, months: [], weekdays: [], moons: [],
+  },
+  modern: {
+    label: 'Modern (Gregorian)', desc: 'January to December with leap years, the real week and Earth\'s moon.',
+    fm: { custom_calendar: false, custom_eras: false }, months: [], weekdays: [], moons: [],
+  },
+  fixed13: {
+    label: 'Thirteen months of 28 days', desc: 'Every month starts on the same weekday, plus a year day (and a leap day).',
+    fm: { custom_calendar: true, custom_eras: false },
+    months: ['First, 28', 'Second, 28', 'Third, 28', 'Fourth, 28', 'Fifth, 28', 'Sixth, 28', 'Leap Day, 0, +1 every 4, except every 100, but every 400', 'Seventh, 28', 'Eighth, 28', 'Ninth, 28', 'Tenth, 28', 'Eleventh, 28', 'Twelfth, 28', 'Thirteenth, 28', 'Year Day, 1'],
+    weekdays: ['Firstday', 'Secondday', 'Thirdday', 'Fourthday', 'Fifthday', 'Sixthday', 'Restday'], moons: [],
+  },
+  thirty: {
+    label: 'Twelve months of 30 days + 5', desc: 'Twelve even months and five festival days at the end, plus a leap day every fourth year.',
+    fm: { custom_calendar: true, custom_eras: false },
+    months: ['First, 30', 'Second, 30', 'Third, 30', 'Fourth, 30', 'Fifth, 30', 'Sixth, 30', 'Seventh, 30', 'Eighth, 30', 'Ninth, 30', 'Tenth, 30', 'Eleventh, 30', 'Twelfth, 30', 'Festival, 5, +1 every 4'],
+    weekdays: ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'], moons: [],
+  },
+  lunar: {
+    label: 'Lunar (12 moons, leap month)', desc: 'Months of 30 and 29 days that follow the moon, with a 13th month in 7 years of every 19.',
+    fm: { custom_calendar: true, custom_eras: false },
+    months: ['First Moon, 30', 'Second Moon, 29', 'Third Moon, 30', 'Fourth Moon, 29', 'Fifth Moon, 30', 'Sixth Moon, 29', 'Seventh Moon, 30', 'Eighth Moon, 29', 'Ninth Moon, 30', 'Tenth Moon, 29', 'Eleventh Moon, 30', 'Twelfth Moon, 29', 'Leap Moon, 0, +30 every 3'],
+    weekdays: [], moons: ['Moon, 29.5306, 0'],
+  },
+};
+
 /* The calendar note a project starts with, carrying over anything set in the old settings boxes. */
-function calendarTemplate(old) {
+function calendarTemplate(old, extra) {
   old = old || {};
+  extra = extra || {};
   const q = (v) => JSON.stringify(String(v == null ? '' : v));
   const hol = calLines(old.holidays).map((l) => {
     const [name, mo, d] = l.split(',').map((x) => x.trim());
     return name && mo && d ? `- ${name}: ${d} ${mo}` : `- ${l}`;
   });
   const list = (t) => calLines(t).map((l) => `- ${l}`).join('\n');
+  const fm = ['---', 'type: calendar'];
+  if (extra.primary) fm.push('primary: true');
+  if (extra.short) fm.push(`short: ${q(extra.short)}`);
+  if (extra.primary !== false) fm.push(`present: ${q(old.present || '')}`);
+  fm.push(`custom_calendar: ${old.custom ? 'true' : 'false'}`);
+  /* Eras: given outright, or carried over from the old era settings. */
+  const er = old.eras ? { eras: old.eras, repeat: old.eraRepeat, fmt: old.eraFormat, word: old.eraWord }
+    : legacyEras({ custom_eras: old.customEras, backward_eras: old.negativeEras || 'BC, BCE', forward_era: old.forwardEra || '', year_zero: old.yearZero }, []);
+  if (er.repeat) fm.push(`era_repeat: ${er.repeat}`);
+  if (er.fmt) fm.push(`era_format: ${q(er.fmt)}`);
+  if (er.word && er.word !== 'Era' && er.word !== 'Age') fm.push(`era_word: ${q(er.word)}`);
+  const eraLines = new Eras(er.eras, er).isDefault ? [] : er.eras.map((e) => `- ${eraLine(e)}`);
+  if (extra.align) fm.push(`align: ${q(extra.align)}`);
+  fm.push('---');
   return [
-    '---',
-    'type: calendar',
-    `present: ${q(old.present || '')}`,
-    `custom_calendar: ${old.custom ? 'true' : 'false'}`,
-    `custom_eras: ${old.customEras ? 'true' : 'false'}`,
-    `backward_eras: ${q(old.negativeEras || 'BC, BCE')}`,
-    `forward_era: ${q(old.forwardEra || '')}`,
-    `year_zero: ${old.yearZero ? 'true' : 'false'}`,
-    '---',
+    ...fm,
     '',
-    '%% Loresmith reads this note. With custom_calendar and custom_eras off, the world uses the modern calendar,',
-    'and an empty "present" means today. Anything between double percent signs is ignored. %%',
+    '%% Loresmith reads this note. The easiest way to change it is Edit calendar, on the Calendar page.',
+    'Anything between double percent signs is ignored. %%',
     '',
     '## Months',
     '',
-    '%% Used when custom_calendar is on. One per line, in order: name, number of days.',
+    '%% Used when custom_calendar is on. One per line, in order: name, number of days, and a leap rule if it has one:',
+    '"Poa, 27, +1 every 4" or "+1 every 4, except every 100, but every 400". A 0-day month with a rule is a leap month.',
     'If the calendar changes partway through history, add another section such as "## Months (from 1100)".',
     'Write "Modern" in a dated section to switch back to January to December. %%',
     list(old.months),
@@ -1411,8 +2316,19 @@ function calendarTemplate(old) {
     '## Moons',
     '',
     '%% One per line: name, days per cycle, days after the first day of year 1 that it was new.',
-    'Leave empty for Earth\'s moon on the modern calendar. %%',
+    'Moons belong to the world, so every calendar shows them. Leave empty for Earth\'s moon on the modern calendar. %%',
     list(old.moons),
+    '',
+    '## Eras',
+    '',
+    '%% How years are numbered. Easiest to change with Edit calendar. One era per line, oldest first:',
+    'name (short form), length in years (blank: open-ended), how its years count, and optionally how they\'re written.',
+    '- Before Christ (BC/BCE), , down to 1          395 BC … 1 BC',
+    '- Anno Domini (AD), , up from 1                1 AD, 2 AD …',
+    '- Ancient, , up to -1, "{y} {short}"           -1195 Ancient … -1 Ancient',
+    '- Divine Age (Divine), 100, up from 1           1 Divine … 100 Divine',
+    'era_repeat: 100 in the properties keeps adding eras of that length after the last one. Empty: BC and plain years. %%',
+    eraLines.join('\n'),
     '',
     '## History',
     '',
@@ -2171,6 +3087,7 @@ class LoresmithPlugin extends Plugin {
     this.addCommand({ id: 'new-arc', name: 'Create plot arc', callback: () => this.promptCreate('arc') });
     this.addCommand({ id: 'new-creature', name: 'Create creature', callback: () => this.promptCreate('creature') });
     this.addCommand({ id: 'new-plant', name: 'Create plant', callback: () => this.promptCreate('plant') });
+    this.addCommand({ id: 'sort-places', name: 'Sort locations into nations, regions and settlements', callback: () => new PlaceSorterModal(this.app, this).open() });
     this.addCommand({ id: 'move-classification', name: 'Move a whole classification of species to the Bestiary or Flora', callback: () => this.moveClassification() });
     this.addCommand({ id: 'open-web', name: 'Open relations web', callback: () => this.openWeb() });
     this.addCommand({ id: 'open-timeline', name: 'Open timeline', callback: () => this.openOverview('timeline') });
@@ -2212,7 +3129,7 @@ class LoresmithPlugin extends Plugin {
       if (isCal || this._calTexts.has(f.path)) {
         if (isCal) this._calTexts.set(f.path, data); else this._calTexts.delete(f.path);
         this.dropCalendar();
-      } else if (this.typeOf(f) === 'holiday' || (this._calModel && this._calModel.holidays.some((h) => h.file === f))) this.dropCalendar();
+      } else if (this.typeOf(f) === 'holiday' || (this._world && this._world.keptBy.has(f.path))) this.dropCalendar();
     }));
     const dropCal = (f, old) => {
       if (this._calTexts && (this._calTexts.has(f.path) || this._calTexts.has(old))) { this._calTexts.delete(old); this._calTexts.delete(f.path); }
@@ -2235,7 +3152,10 @@ class LoresmithPlugin extends Plugin {
       this.addCommand({ id: `generate-${k}`, name: `Generate: ${g.label.toLowerCase()}`, callback: () => this.openOverview(`gen:${k}`) });
     }
     this.addCommand({ id: 'open-calendar', name: 'Open calendar', callback: () => this.openOverview('calendar') });
-    this.addCommand({ id: 'open-calendar-note', name: 'Open calendar note (months, holidays, history)', callback: () => this.openCalendarNote() });
+    this.addCommand({ id: 'open-calendar-note', name: 'Open calendar note (months, holidays, history)', callback: () => new ItemSuggest(this.app, this.calendars(), (c) => c.name, 'Which calendar?', (c) => this.openCalendarNote(c)).open() });
+    this.addCommand({ id: 'edit-calendar', name: 'Edit a calendar', callback: () => { const cs = this.calendars(); if (cs.length === 1) this.editCalendar(cs[0]); else new ItemSuggest(this.app, cs, (c) => c.name, 'Which calendar?', (c) => this.editCalendar(c)).open(); } });
+    this.addCommand({ id: 'new-calendar', name: 'Create calendar', callback: () => this.newCalendarFlow() });
+    this.addCommand({ id: 'convert-date', name: 'Convert a date between calendars', callback: () => new ConvertDateModal(this.app, this).open() });
     this.addCommand({ id: 'open-meetings', name: 'Open who has met whom', callback: () => this.openOverview('meetings') });
     this.addCommand({ id: 'sync-links', name: 'Make relationship links two-way', callback: () => this.syncLinks() });
     for (const [kind, label] of [['docx', 'Export manuscript (.docx)'], ['epub', 'Export ebook (.epub)']]) {
@@ -2274,7 +3194,7 @@ class LoresmithPlugin extends Plugin {
     }));
 
     this.addSettingTab(new LoresmithSettingTab(this.app, this));
-    this.app.workspace.onLayoutReady(() => { const f = this.calNoteFile(); if (f) this.loadCalText(f); });
+    this.app.workspace.onLayoutReady(() => { for (const f of this.calendarNotes()) this.loadCalText(f); });
 
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass('ls-status-bar', 'mod-clickable');
@@ -2300,7 +3220,7 @@ class LoresmithPlugin extends Plugin {
     this.settings.presentYears = Object.assign({}, data.presentYears);
     this.settings.calendars = Object.assign({}, data.calendars);
     const cv = data.calendarView || {};
-    this.settings.calendarView = { mode: cv.mode === 'month' ? 'month' : 'year', show: Object.assign({}, cv.show) };
+    this.settings.calendarView = { mode: cv.mode === 'month' ? 'month' : 'year', show: Object.assign({}, cv.show), cal: String(cv.cal || ''), compare: String(cv.compare || '') };
     this.settings.manuscript = Object.assign({}, DEFAULT_SETTINGS.manuscript, data.manuscript);
     this.settings.sheetGroups = Object.assign({}, data.sheetGroups);
     this.settings.groupBy = Object.assign({}, data.groupBy);
@@ -2312,34 +3232,14 @@ class LoresmithPlugin extends Plugin {
   }
   async saveSettings() { this._graph = null; this.dropCalendar(); await this.saveData(this.settings); if (this.statusEl) this.updateStatusBar(); }
 
-  /* ---------- in-world dates: calendar, eras, ages, "years ago" ---------- */
+  /* ---------- in-world dates: calendars, eras, ages, "years ago" ---------- */
 
-  eras() { return this.calModel().eras; }
-  negEras() { return this.eras().neg; }
-
-  /* -300 -> "300 BC", 1023 -> "1023 AC" (or "1023" with no forward era label). */
-  fmtYear(y) {
-    if (y == null) return '';
-    const e = this.eras();
-    if (y < 0) return `${-y} ${e.neg[0] || 'BC'}`;
-    return e.fwd ? `${y} ${e.fwd}` : String(y);
-  }
-  /* Whole calendar years from year a to year b. Without a year 0, 1 BC to 1 AC is one year, not two. */
-  yearsBetween(a, b) {
-    let d = b - a;
-    if (!this.eras().zero) {
-      if (a < 0 && b > 0) d -= 1;
-      else if (a > 0 && b < 0) d += 1;
-    }
-    return d;
-  }
-
-  /* The project's calendar note: a note with type: calendar directly in the project folder. */
-  calNoteFile() {
+  /* Every calendar note in the project (type: calendar), however deep. */
+  calendarNotes() {
     const root = this.projectPath();
-    const folder = root && this.app.vault.getAbstractFileByPath(root);
-    if (!(folder instanceof TFolder)) return null;
-    return folder.children.find((c) => c instanceof TFile && c.extension === 'md' && String(this.fm(c).type || '').toLowerCase() === 'calendar') || null;
+    if (!root) return [];
+    return this.app.vault.getMarkdownFiles()
+      .filter((f) => f.path.startsWith(root + '/') && String(this.fm(f).type || this.fm(f).lore || '').toLowerCase() === 'calendar');
   }
   /* What the old settings boxes held for this project, used until the project has a calendar note. */
   legacyCalSource() {
@@ -2355,111 +3255,299 @@ class LoresmithPlugin extends Plugin {
       negativeEras: negs || 'BC, BCE', forwardEra: s.forwardEra || '', yearZero: !!s.yearZero,
     };
   }
-  /* The calendar model, rebuilt when the calendar note or settings change. */
-  calModel() {
-    if (this._calModel) return this._calModel;
+
+  /* All the project's calendars, lined up on one shared count of days. Rebuilt when a calendar note,
+     a holiday or the settings change.
+     { cals, primary, byId, byFile, keptBy (entry path -> calendar), moons (on the shared count), present } */
+  world() {
+    if (this._world && this._worldKey === this.settings.activeProject) return this._world;
     this._calTexts = this._calTexts || new Map();
-    const f = this.calNoteFile();
-    let model;
-    if (f) {
-      let text = this._calTexts.get(f.path);
-      if (text == null) { this.loadCalText(f); text = ''; }
-      model = buildCalModel(this.fm(f), splitFm(text).body, f.path);
+    const notes = this.calendarNotes();
+    const cals = [];
+    if (notes.length) {
+      for (const f of notes) {
+        let text = this._calTexts.get(f.path);
+        if (text == null) { this.loadCalText(f); text = ''; }
+        const model = buildCalModel(this.fm(f), splitFm(text).body, f.path);
+        cals.push(new Cal(model, { id: f.path, name: f.basename, file: f }));
+      }
     } else {
-      const old = this.legacyCalSource();
-      model = buildCalModel(readFm(calendarTemplate(old)), splitFm(calendarTemplate(old)).body, null);
+      const t = calendarTemplate(this.legacyCalSource(), { primary: true });
+      cals.push(new Cal(buildCalModel(readFm(t), splitFm(t).body, null), { id: 'legacy', name: 'Calendar' }));
     }
-    /* Holiday entries (the Holidays tab) join the ones written in the calendar note's History section. */
-    if (!model.broken) for (const f of this.index().holiday) {
-      const h = this.holidayFromNote(f, model.eras.neg);
-      if (h) model.holidays.push(h);
+    const root = this.projectPath();
+    const primary = cals.find((c) => c.model.primary)
+      || cals.find((c) => c.file && c.file.parent && c.file.parent.path === root)
+      || cals.find((c) => c.name.toLowerCase() === 'calendar')
+      || cals.slice().sort((a, b) => natural(a.name, b.name))[0];
+    cals.sort((a, b) => (a === primary ? -1 : b === primary ? 1 : natural(a.name, b.name)));
+    const used = new Set(cals.map((c) => c.model.color).filter(Boolean));
+    let ci = 0;
+    for (const c of cals) {
+      if (c.model.color) continue;
+      while (used.has(CAL_COLORS[ci % CAL_COLORS.length]) && ci < CAL_COLORS.length) ci++;
+      c.color = CAL_COLORS[ci % CAL_COLORS.length];
+      ci++;
     }
-    model.years = new Map();
-    model.before = new Map();
-    this._calModel = model;
-    return model;
-  }
-  /* A Holiday entry as a calendar rule. "Last held" is the last year it was kept, so it stops the year after. */
-  holidayFromNote(f, neg) {
-    const h = this.holidayFromFm(this.fm(f), f.basename, neg);
-    if (h) h.file = f;
-    return h;
-  }
-  holidayFromFm(fm, name, neg) {
-    const ruleText = String(fm.date || '').trim();
-    const rule = parseDayRule(ruleText);
-    if (!rule) return null;
-    const from = fm.first_held != null && String(fm.first_held).trim() ? parseYear(fm.first_held, neg) : null;
-    const lastHeld = fm.last_held != null && String(fm.last_held).trim() ? parseYear(fm.last_held, neg) : null;
-    return {
-      kind: 'holiday', name, rule, ruleText, note: fm.kind ? String(fm.kind) : '',
-      from, to: lastHeld == null ? null : lastHeld + 1, lastHeld,
-      days: Math.max(1, Math.round(Number(fm.days)) || 1), file: null, keptBy: toArr(fm.kept_by),
+    const w = { cals, primary, byId: new Map(cals.map((c) => [c.id, c])), byFile: new Map(), keptBy: new Map(), moons: [], present: null };
+    for (const c of cals) if (c.file) w.byFile.set(c.file.path, c);
+    this._world = w;
+    this._worldKey = this.settings.activeProject;
+
+    /* Line every calendar up against the primary (or whichever calendar its align line names). */
+    const busy = new Set();
+    const place = (c) => {
+      if (c.placed) return c.epoch;
+      if (c === primary) { c.epoch = 0; c.placed = true; return 0; }
+      if (busy.has(c)) { c.alignError = 'Its line-up goes round in a circle back to itself.'; return 0; }
+      busy.add(c);
+      let e = 0;
+      const m = c.model;
+      if (m.epochDays != null) e = m.epochDays;
+      else if (m.align) {
+        const [l, r] = String(m.align).split(/\s*=\s*/);
+        const lp = l ? c.parse(l) : null;
+        const det = r ? detectCal(w, r, primary) : null;
+        const other = det && det.cal !== c ? det.cal : primary;
+        place(other);
+        const rp = det ? other.parse(det.text) : null;
+        if (lp && rp && lp.d != null && rp.d != null) e = other.epoch + other.toDay(rp.y, rp.d) - c.toDay(lp.y, lp.d);
+        else if (lp && rp) e = other.epoch + other.daysBefore(rp.y) - c.daysBefore(lp.y);
+        else c.alignError = `Can't read the line-up "${m.align}". Write a date in this calendar, "=", and the same day in another one.`;
+        c.alignTo = other;
+      } else if (c !== primary) c.unaligned = true;
+      busy.delete(c);
+      c.epoch = e;
+      c.placed = true;
+      return e;
     };
+    for (const c of cals) place(c);
+    /* Weeks kept in step with another calendar's: shift this week so the same day falls on the same weekday. */
+    const byName = (n) => cals.find((x) => x.keys().some((k) => k.toLowerCase() === n.toLowerCase()));
+    for (let pass = 0; pass < cals.length; pass++) {
+      for (const c of cals) {
+        if (!c.model.weekLike) continue;
+        const T = byName(c.model.weekLike);
+        const ws = c.weekSets[0], wt = T && T.weekSets[0];
+        if (!T || T === c) { c.weekError = `"${c.model.weekLike}" isn't another calendar.`; continue; }
+        if (!ws || !wt || ws.from !== -Infinity || wt.from !== -Infinity) { c.weekError = 'Both calendars need a week.'; continue; }
+        if (ws.list.length !== wt.list.length) { c.weekError = `Its week has ${ws.list.length} days and ${T.the()}'s has ${wt.list.length}, so they can't keep step.`; continue; }
+        const base = T.epoch - c.epoch + wt.base;
+        if (ws.base !== base) { ws.base = base; c._years.clear(); }
+        c.weekError = null;
+      }
+    }
+
+    /* Moons belong to the world: each calendar's are moved onto the shared count, and a name counts once. */
+    const seen = new Set();
+    const ownMoons = cals.some((c) => c.moons.some((m) => !m.earth));
+    for (const c of cals) {
+      for (const m of c.moons) {
+        if (m.earth && ownMoons) continue;
+        const k = m.name.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        w.moons.push({ name: m.name, cycle: m.cycle, offset: m.offset + c.epoch, cal: c });
+      }
+    }
+    /* When each calendar was in use, on the shared count: from the first day of "from" to the last day of "until". */
+    for (const c of cals) {
+      c.useFrom = -Infinity; c.useUntil = Infinity;
+      const end = (pt) => (pt.d != null ? this.gOf(pt) : pt.cal.epoch + pt.cal.daysBefore(pt.y) + pt.cal.year(pt.y).yearDays - 1);
+      if (c.model.useFrom) { const pt = this.toPt(c.model.useFrom, c); if (pt) c.useFrom = this.gOf(pt); }
+      if (c.model.useUntil) { const pt = this.toPt(c.model.useUntil, c); if (pt) c.useUntil = end(pt); }
+    }
+    /* Who keeps which calendar, from the calendars' Kept by lists. */
+    for (const c of cals) {
+      if (!c.file) continue;
+      for (const s of c.model.keptBy) { const d = this.resolveLink(s, c.file); if (d && !w.keptBy.has(d.path)) w.keptBy.set(d.path, c); }
+    }
+    const pc = primary.model.present != null ? primary : cals.find((c) => c.model.present != null);
+    w.present = pc ? pc.model.present : null;
+    /* Holiday entries (the Holidays tab) join the ones written in the calendars' History sections. */
+    for (const f of this.index().holiday) {
+      for (const o of this.holidayObservances(this.fm(f), f)) {
+        if (!o.h || o.cal.broken) continue;
+        o.h.file = f;
+        o.cal.holidays.push(o.h);
+      }
+    }
+    return w;
   }
-  /* Day of the year a holiday falls on in year y, or null if it isn't held that year or its date can't be read. */
-  holidayDay(h, y, cal) {
-    cal = cal || this.calendar(y);
-    if (!cal) return null;
-    if (h.from != null && y < h.from) return null;
-    if (h.to != null && y >= h.to) return null;
-    const k = h.rule.month.toLowerCase().replace(/\.$/, '');
-    const m = cal.months.find((x) => x.name.toLowerCase() === k || x.aliases.some((a) => a.toLowerCase() === k));
-    if (!m) return null;
-    if (h.rule.kind === 'date') return h.rule.day >= 1 && h.rule.day <= m.days ? m.start + h.rule.day : null;
-    if (!cal.weekdays.length) return null;
-    const want = cal.weekdays.findIndex((w) => w.toLowerCase() === h.rule.weekday.toLowerCase());
-    if (want < 0) return null;
-    const len = cal.weekdays.length;
-    const firstWd = mod(this.daysBefore(y) + m.start - cal.wdBase, len);
-    const first = 1 + mod(want - firstWd, len);
-    const day = h.rule.n > 0 ? first + (h.rule.n - 1) * len : first + Math.floor((m.days - first) / len) * len;
-    return day <= m.days ? m.start + day : null;
+  calendars() { return this.world().cals; }
+  primaryCal() { return this.world().primary; }
+  calById(id) { const w = this.world(); return (id && (w.byId.get(id) || w.byFile.get(id))) || w.primary; }
+  /* Was calendar c in use on day g of the shared count? */
+  inUse(c, g) { return g == null || (g >= c.useFrom && g <= c.useUntil); }
+  /* The calendars in use on day g, the primary first; never empty (falls back to the nearest one). */
+  calsAt(g) {
+    const all = this.calendars().filter((c) => !c.broken);
+    const on = all.filter((c) => this.inUse(c, g));
+    if (on.length) return on;
+    const dist = (c) => (g < c.useFrom ? c.useFrom - g : g - c.useUntil);
+    return [all.slice().sort((a, b) => dist(a) - dist(b))[0] || this.primaryCal()];
   }
-  /* Lines for a holiday's page: when it next falls, how long it has been kept, or why its date can't be read. */
+  /* "In use at the time": the calendar to show a day in. */
+  calAt(g) { return this.calsAt(g)[0]; }
+  /* "in use from 1:1 Divine", "in use 395 BC to 1:1 Divine", or '' when always. */
+  useText(c) {
+    const f = Number.isFinite(c.useFrom) ? c.dateText(this.ptAt(c.useFrom, c)) : '';
+    const u = Number.isFinite(c.useUntil) ? c.dateText(this.ptAt(c.useUntil, c)) : '';
+    if (f && u) return `in use ${f} to ${u}`;
+    if (f) return `in use from ${f}`;
+    if (u) return `in use until ${u}`;
+    return '';
+  }
+  eras() { return this.primaryCal().eras; }
+  /* The primary calendar's year reader, for parseYear: it knows its eras. */
+  negEras() { return this.primaryCal().yp; }
+  /* -300 -> "300 BC", 1023 -> "1023 AC", in the primary calendar. */
+  fmtYear(y) { return this.primaryCal().fmtYear(y); }
+  yearsBetween(a, b) { return this.primaryCal().yearsBetween(a, b); }
+  /* The primary calendar's note (null until the project has one). */
+  calNoteFile() { return this.primaryCal().file; }
+
+  /* The calendar an entry's dates are read in when the date itself doesn't say: its own Calendar field, its story's,
+     then a calendar kept by its culture, group or house, then the primary. */
+  calFor(file) {
+    const w = this.world();
+    if (!file || w.cals.length === 1) return w.primary;
+    if (this.typeOf(file) === 'calendar') return w.byFile.get(file.path) || w.primary;
+    const own = (f) => {
+      for (const k of ['calendar', 'calendars']) {
+        for (const s of toArr(this.fm(f)[k])) { const d = this.resolveLink(s, f); const c = d && w.byFile.get(d.path); if (c) return c; }
+      }
+      return w.keptBy.get(f.path) || null;
+    };
+    let c = own(file);
+    if (c) return c;
+    const story = this.storyFor(file);
+    if (story && story !== file && (c = own(story))) return c;
+    for (const k of ['culture', 'cultures', 'nationality', 'nation', 'kept_by', 'affiliation', 'house', 'participants', 'species']) {
+      for (const s of toArr(this.fm(file)[k])) {
+        const d = this.resolveLink(s, file);
+        if (d && d !== file && (c = own(d))) return c;
+      }
+    }
+    return w.primary;
+  }
+  /* A holiday's dates, one per calendar it's kept on. `date` can be one line or a list:
+       date:
+         - "Chantry: 1 Haring"
+         - "1 Frost (Elven)"
+         - "Imperial: 12 Solace (until 1:20 Divine), as the Feast of Andraste"
+     Each line names its calendar (or its month names give it away; else the Calendar field, then the holiday's keepers').
+     Years in brackets say when that date was kept, in its own calendar unless they say otherwise; a note after a comma
+     shows in the day's details. First held and Last held apply to every date, and can be written in any calendar. */
+  holidayDateLines(fm) { return toArr(fm.date).map((x) => String(x).trim()).filter(Boolean); }
+  holidayObservances(fm, file) {
+    const w = this.world();
+    const lines = this.holidayDateLines(fm);
+    const def = [];
+    for (const s of toArr(fm.calendar)) { const d = this.resolveLink(s, file); const c = d && w.byFile.get(d.path); if (c) def.push(c); }
+    const hint = def[0] || (file ? this.calFor(file) : null);
+    /* Kept from the first day of First held to the last day of Last held, on the shared count. */
+    let fromG = null, toG = null;
+    if (fm.first_held != null && String(fm.first_held).trim()) { const pt = this.toPt(String(fm.first_held), hint); if (pt) fromG = pt.d != null ? this.gOf(pt) : pt.cal.epoch + pt.cal.daysBefore(pt.y); }
+    if (fm.last_held != null && String(fm.last_held).trim()) { const pt = this.toPt(String(fm.last_held), hint); if (pt) toG = pt.d != null ? this.gOf(pt) : pt.cal.epoch + pt.cal.daysBefore(pt.y) + pt.cal.year(pt.y).yearDays - 1; }
+    const used = new Set();
+    return lines.map((line, i) => {
+      const o = this.parseObservance(line, def.length > 1 ? def.find((c) => !used.has(c)) || def[0] : hint, file);
+      used.add(o.cal);
+      if (o.h) Object.assign(o.h, {
+        name: file ? file.basename : 'It', note: [fm.kind ? String(fm.kind) : '', o.note].filter(Boolean).join(', '),
+        days: Math.max(1, Math.round(Number(o.days || fm.days)) || 1), keptBy: toArr(fm.kept_by), obs: i, fromG, toG,
+        firstHeld: fm.first_held, lastHeldText: fm.last_held,
+      });
+      return o;
+    });
+  }
+  /* One date line -> { line, cal, rule, h (the calendar rule, or null), note, from, to, error }. */
+  parseObservance(line, hint, file) {
+    const w = this.world();
+    let t = String(line).trim();
+    let range = null;
+    const pm = t.match(/\s*\(([^()]*\d[^()]*)\)/);
+    if (pm) { range = pm[1]; t = (t.slice(0, pm.index) + t.slice(pm.index + pm[0].length)).trim(); }
+    let note = '', days = null;
+    const det = detectCal(w, t.replace(/\s*,\s*.*$/, '').trim(), hint);
+    const cut = t.search(/\s*(?:,|;|\s[—–]\s)\s*/);
+    if (cut >= 0) {
+      note = t.slice(cut).replace(/^\s*(?:,|;|[—–])\s*/, '').trim();
+      const dm = note.match(/^(\d+)\s*days?$/i);
+      if (dm) { days = Number(dm[1]); note = ''; }
+    }
+    const cal = det.cal;
+    const ruleText = det.text.replace(/\s*\(\s*\)\s*$/, '').trim();
+    const rule = parseDayRule(ruleText);
+    const out = { line, cal, rule, ruleText, note, days, range, h: null, error: '' };
+    if (cal.broken) { out.error = `${cap(cal.the())} has no months yet.`; return out; }
+    if (!rule) { out.error = `Can't read "${ruleText}". Write a day and month ("1 Frostmoon") or a weekday rule ("last Moonday of Seedtime"), with no year.`; return out; }
+    let from = null, to = null, lastHeld = null;
+    /* "(from 1012)", "(until 1050)", "(1012–1050)": years in this calendar unless they name another; the last year is kept. */
+    if (range) {
+      const r = parseRange(range, (v) => { const pt = this.toPt(v, cal); return pt ? this.inCal(pt, cal).y : null; });
+      from = r.from;
+      if (r.to != null) { lastHeld = r.to; to = cal.next(r.to); }
+    }
+    out.h = { kind: 'holiday', name: file ? file.basename : 'It', rule, ruleText, note, from, to, lastHeld, days: 1, file: null, keptBy: [], cal };
+    return out;
+  }
+  /* Kept for compatibility: the first calendar a holiday is kept on. */
+  holidayCalFor(fm, file) { const o = this.holidayObservances(fm, file)[0]; return o ? o.cal : this.primaryCal(); }
+
+  /* Lines for a holiday's page: each date it's kept on, when it next falls, how long it has been kept, or what's wrong. */
   holidaySummary(fm, file) {
-    const raw = String(fm.date || '').trim();
-    if (!raw) return ['Set "When" to put it on the calendar: a day and month like "1 Frostmoon", or "last Moonday of Seedtime".'];
-    const h = this.holidayFromFm(fm, file ? file.basename : 'It', this.negEras());
-    if (!h) return [`Can't read "${raw}". Write a day and month ("1 Frostmoon", "Frostmoon 1"), or a weekday rule ("last Moonday of Seedtime"), with no year.`];
-    const now = this.latestPresent() || { y: h.from != null ? h.from : 1, d: null };
-    const cal = this.calendar(now.y);
-    if (!cal) return ['Your custom calendar has no months yet, so this can\'t be placed.'];
+    const obs = this.holidayObservances(fm, file);
+    if (!obs.length) return ['Add a date to put it on the calendar: a day and month like "1 Frostmoon", or "last Moonday of Seedtime".'];
+    const many = this.calendars().length > 1;
+    const latest = this.latestPresent();
     const lines = [];
-    const k = h.rule.month.toLowerCase().replace(/\.$/, '');
-    const month = cal.months.find((x) => x.name.toLowerCase() === k || x.aliases.some((a) => a.toLowerCase() === k));
-    if (!month && !(h.from != null && h.from > now.y)) lines.push(`"${h.rule.month}" isn't a month on your calendar in ${this.fmtYear(now.y)}.`);
-    if (h.rule.kind === 'nth' && cal.weekdays.length && !cal.weekdays.some((w) => w.toLowerCase() === h.rule.weekday.toLowerCase())) {
-      lines.push(`"${h.rule.weekday}" isn't one of your weekdays (${cal.weekdays.join(', ')}).`);
+    let soonest = null;
+    for (const o of obs) {
+      const cal = o.cal;
+      const lead = obs.length > 1 || many ? `${cal.name}: ` : '';
+      if (!o.h) { lines.push(lead + o.error); continue; }
+      const h = o.h;
+      const now = latest ? this.inCal(latest, cal) : { y: 1, d: null, cal, raw: '' };
+      const yr = cal.year(now.y);
+      const k = h.rule.month.toLowerCase().replace(/\.$/, '');
+      if (!yr.months.some((x) => x.name.toLowerCase() === k || x.aliases.some((a) => a.toLowerCase() === k)) && !cal.monthSets.some((ms) => (ms.modern ? MODERN_MONTHS.map((m) => m[0]) : ms.months.map((m) => m.name)).some((n) => n.toLowerCase() === k))) {
+        lines.push(`${lead}"${h.rule.month}" isn't a month on ${cal.the()}.`); continue;
+      }
+      if (h.rule.kind === 'nth' && yr.weekdays.length && !yr.weekdays.some((x) => x.toLowerCase() === h.rule.weekday.toLowerCase())) {
+        lines.push(`${lead}"${h.rule.weekday}" isn't one of the ${cal.name} weekdays (${yr.weekdays.join(', ')}).`); continue;
+      }
+      const next = cal.nextHoliday(h, now);
+      const kept = h.from != null || h.to != null ? ` (${h.from != null ? `from ${cal.fmtYear(h.from)}` : ''}${h.from != null && h.to != null ? ' ' : ''}${h.to != null ? `until ${cal.fmtYear(h.lastHeld != null ? h.lastHeld : h.to)}` : ''})` : '';
+      if (next) {
+        const wd = cal.weekday(next.y, next.d);
+        const g = this.gOf(next);
+        if (!soonest || g < soonest.g) soonest = { g, next, cal };
+        const today = now.d != null && next.y === now.y && next.d === now.d;
+        lines.push(`${lead}${h.ruleText}${kept}. ${today ? 'Falls on the present day' : 'Next'}: ${wd ? wd + ', ' : ''}${cal.dateText(next)}${h.days > 1 ? ` (${h.days} days)` : ''}.`);
+      } else lines.push(`${lead}${h.ruleText}${kept}. No longer kept on this calendar.`);
     }
-    if (h.from != null && h.lastHeld != null && h.lastHeld < h.from) lines.push('"Last held" is before "First held".');
-    if (lines.length) return lines;
-    const ago = (y) => this.agoText({ y, d: null }, now);
-    if (h.lastHeld != null && h.lastHeld < now.y) {
-      lines.push(`No longer kept: last held in ${this.fmtYear(h.lastHeld)}, ${ago(h.lastHeld)}.`);
-      if (h.from != null) lines.push(`It was kept for ${fmtNum(this.yearsBetween(h.from, h.lastHeld) + 1)} years.`);
-      return lines;
+    /* When the soonest falls, in every calendar, and whether two dates land on the same day. */
+    if (soonest && many) {
+      const elsewhere = this.otherDates(soonest.next).filter((x) => x.inUse).map((x) => `${x.text} (${x.cal.label()})`);
+      if (elsewhere.length) lines.push(`Next of all: ${soonest.cal.dateText(soonest.next)}, which is ${elsewhere.join('; ')}.`);
     }
-    const next = this.nextHoliday(h, now);
-    if (next) {
-      const wd = this.weekdayOf(next);
-      const when = `${wd ? wd + ', ' : ''}${this.dateText(next)}`;
-      const today = now.d != null && next.y === now.y && next.d === now.d;
-      lines.push(today ? `Falls on the present day: ${when}.` : `Next: ${when}${h.days > 1 ? ` (${h.days} days)` : ''}.`);
-    } else lines.push('It never falls on a day in the coming years: check the date.');
-    if (h.from != null && h.from <= now.y) lines.push(`Kept since ${this.fmtYear(h.from)} (${fmtNum(this.yearsBetween(h.from, now.y))} years as of ${now.raw}).`);
-    else if (h.from != null) lines.push(`First held in ${this.fmtYear(h.from)}, ${ago(h.from)}.`);
-    if (h.lastHeld != null) lines.push(`Last held in ${this.fmtYear(h.lastHeld)}.`);
+    const first = obs.find((o) => o.h);
+    if (first) {
+      const h = first.h;
+      const cal = first.cal;
+      const now = latest ? this.inCal(latest, cal) : null;
+      if (h.fromG != null) {
+        const st = this.ptAt(h.fromG, cal);
+        lines.push(now && this.cmpPt(st, now) <= 0 ? `First held ${cal.yearText(st.y, st.d)}, ${this.agoText(st, now)}.` : `First held in ${cal.yearText(st.y, st.d)}.`);
+      }
+      if (h.toG != null) {
+        const en = this.ptAt(h.toG, cal);
+        lines.push(now && this.cmpPt(en, now) < 0 ? `No longer kept: last held in ${cal.yearText(en.y, en.d)}, ${this.agoText(en, now)}.` : `Last held in ${cal.yearText(en.y, en.d)}.`);
+      }
+    }
     return lines;
-  }
-  /* The next time a holiday is held, on or after `from` (a point), looking up to 400 years ahead. */
-  nextHoliday(h, from) {
-    for (let y = from.y, i = 0; i < 400; i++, y = y === -1 && !this.eras().zero ? 1 : y + 1) {
-      if (h.to != null && y >= h.to) return null;
-      const d = this.holidayDay(h, y);
-      if (d != null && (y > from.y || from.d == null || d >= from.d)) return { y, d };
-    }
-    return null;
   }
   loadCalText(f) {
     this._calLoading = this._calLoading || new Set();
@@ -2472,7 +3560,7 @@ class LoresmithPlugin extends Plugin {
       this.rerenderViews();
     }, () => this._calLoading.delete(f.path));
   }
-  dropCalendar() { this._calModel = null; this._scan = undefined; }
+  dropCalendar() { this._world = null; this._scan = undefined; if (this._graph) this._graph.now = undefined; }
   rerenderViews() {
     for (const type of [VIEW_OVERVIEW, VIEW_PANEL, VIEW_ENTITY]) {
       for (const l of this.app.workspace.getLeavesOfType(type)) {
@@ -2484,22 +3572,61 @@ class LoresmithPlugin extends Plugin {
       }
     }
   }
-  /* Creates the calendar note if the project has none yet, carrying over the old settings. */
+  /* Creates the primary calendar note if the project has none yet, carrying over the old settings. */
   async ensureCalendarNote() {
-    const existing = this.calNoteFile();
-    if (existing) return existing;
+    const existing = this.calendarNotes();
+    if (existing.length) return this.primaryCal().file || existing[0];
     const root = this.projectPath();
     if (!root) { new Notice('Create a project first.'); return null; }
     let path = normalizePath(`${root}/Calendar.md`);
     if (this.app.vault.getAbstractFileByPath(path)) path = normalizePath(`${root}/World calendar.md`);
     if (this.app.vault.getAbstractFileByPath(path)) { new Notice(`"${path}" already exists and isn't a calendar note.`); return null; }
-    const text = calendarTemplate(this.legacyCalSource());
+    return this.writeCalendarNote(path, calendarTemplate(this.legacyCalSource(), { primary: true }));
+  }
+  async writeCalendarNote(path, text) {
     const indexed = this.nextMetaChange(path);
     const f = await this.app.vault.create(path, text);
     this._calTexts = this._calTexts || new Map();
     this._calTexts.set(f.path, text);
     await indexed;
     this.dropCalendar();
+    return f;
+  }
+  /* A new calendar from a template (or a copy of another calendar), filed in the project's Calendars folder. */
+  async createCalendar(name, tplKey, opts = {}) {
+    await this.ensureCalendarNote();
+    const root = this.projectPath();
+    if (!root) return null;
+    name = sanitize(name) || 'New calendar';
+    const folder = `${root}/${TYPES.calendar.folder}`;
+    await this.ensureFolder(folder);
+    const path = this.uniquePath(folder, name);
+    let text;
+    const src = opts.copyOf ? this.calById(opts.copyOf) : null;
+    if (src && src.file) {
+      const orig = this._calTexts.get(src.file.path) || await this.app.vault.read(src.file);
+      const { inner, body } = splitFm(orig);
+      const fm = Object.assign({}, inner.trim() ? parseYaml(inner) || {} : {});
+      delete fm.primary; delete fm.present; delete fm.align; delete fm.epoch_day; delete fm.kept_by; delete fm.color; delete fm.short; delete fm.aliases;
+      fm.type = 'calendar';
+      /* Months and weeks carry over; holidays and moons stay with the original (moons belong to the world). */
+      const kept = editBody(body, (pp) => { pp.sections = pp.sections.filter((x) => /^(months|weekdays)\b/i.test(x.name)); });
+      text = `---\n${Object.entries(fm).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n---\n${kept}`;
+    } else {
+      const tpl = CAL_TEMPLATES[tplKey] || CAL_TEMPLATES.blank;
+      const base = calendarTemplate({ custom: !!tpl.fm.custom_calendar, customEras: !!tpl.fm.custom_eras, negativeEras: tpl.fm.backward_eras, forwardEra: tpl.fm.forward_era }, { primary: false });
+      text = base.replace('## Months\n', `## Months\n${tpl.months.length ? '\n' + tpl.months.map((m) => `- ${m}`).join('\n') : ''}`)
+        .replace('## Weekdays\n', `## Weekdays\n${tpl.weekdays.length ? '\n' + tpl.weekdays.map((m) => `- ${m}`).join('\n') : ''}`)
+        .replace('## Moons\n', `## Moons\n${tpl.moons.length ? '\n' + tpl.moons.map((m) => `- ${m}`).join('\n') : ''}`);
+    }
+    const f = await this.writeCalendarNote(path, text);
+    if (opts.align || opts.keptBy) {
+      await this.app.fileManager.processFrontMatter(f, (fm) => {
+        if (opts.align) fm.align = opts.align;
+        if (opts.keptBy) fm.kept_by = [this.linkTo(opts.keptBy, f)];
+      });
+      this.dropCalendar();
+    }
     return f;
   }
   /* Resolves once Obsidian has re-read the note at `path` (or after a moment, whichever comes first). */
@@ -2511,161 +3638,156 @@ class LoresmithPlugin extends Plugin {
       window.setTimeout(done, 2000);
     });
   }
-  async openCalendarNote() {
-    const f = await this.ensureCalendarNote();
+  async openCalendarNote(cal) {
+    const f = cal && cal.file ? cal.file : await this.ensureCalendarNote();
     if (f) await this.openNote(f);
   }
-  /* Sets calendar note properties (creating the note if needed): { custom_calendar: true, present: '1023 AC' }. */
-  async setCalendarProps(props) {
-    const f = await this.ensureCalendarNote();
+  /* The calendar editor, for one calendar (the primary by default). Makes the first note if there isn't one. */
+  async editCalendar(cal) {
+    if (!cal || !cal.file) {
+      const f = await this.ensureCalendarNote();
+      if (!f) return;
+      cal = this.world().byFile.get(f.path) || this.primaryCal();
+    }
+    new CalendarEditorModal(this.app, this, cal.file).open();
+  }
+  newCalendarFlow(after) {
+    new NewCalendarModal(this.app, this, async (name, tpl, copyOf) => {
+      const f = await this.createCalendar(name, tpl, { copyOf });
+      if (!f) return;
+      new Notice(`Created the ${f.basename} calendar. Tell Loresmith how it lines up with your other calendars next.`);
+      new CalendarEditorModal(this.app, this, f).open();
+      if (after) after(f);
+    }).open();
+  }
+  /* Sets calendar note properties (creating the primary note if needed). */
+  async setCalendarProps(props, file) {
+    const f = file || await this.ensureCalendarNote();
     if (!f) return;
     const indexed = this.nextMetaChange(f.path);
-    await this.app.fileManager.processFrontMatter(f, (fm) => Object.assign(fm, props));
+    await this.app.fileManager.processFrontMatter(f, (fm) => {
+      for (const [k, v] of Object.entries(props)) { if (v === null || v === undefined) delete fm[k]; else fm[k] = v; }
+    });
     await indexed;
     this.dropCalendar();
     this.rerenderViews();
   }
-
-  /* Days from the first day of year 1 to the first day of year y, across every calendar change. */
-  daysBefore(y) {
-    const model = this.calModel();
-    if (model.before.has(y)) return model.before.get(y);
-    const zero = model.eras.zero;
-    const segs = model.monthSets;
-    const span = (seg, a, b) => (seg.modern
-      ? gregDaysBefore(astroYear(b, zero)) - gregDaysBefore(astroYear(a, zero))
-      : this.yearsBetween(a, b) * seg.yearDays);
-    const between = (a, b) => {
-      let t = 0;
-      segs.forEach((s, i) => {
-        const lo = Math.max(a, s.from);
-        const hi = Math.min(b, i + 1 < segs.length ? segs[i + 1].from : Infinity);
-        if (lo < hi) t += span(s, lo, hi);
+  async makePrimary(cal) {
+    const old = this.primaryCal();
+    if (!cal.file || old === cal) return;
+    /* Keep every date where it was: the old primary now lines up against the new one. */
+    const anchor = { y: 1, d: 1, cal: old, raw: '' };
+    const there = this.inCal(anchor, cal);
+    const align = old.file && !old.broken && !cal.broken ? `${old.dateText(anchor)} = ${cal.dateText(there)}` : null;
+    const present = old.model.present;
+    const fixed = new Map();
+    for (const c of this.calendars()) {
+      if (c === cal || c === old || !c.unaligned || c.broken || cal.broken) continue;
+      const a = { y: 1, d: 1, cal: c, raw: '' };
+      fixed.set(c, `${c.dateText(a)} = ${cal.dateText(this.inCal(a, cal))}`);
+    }
+    for (const c of this.calendars()) {
+      if (!c.file) continue;
+      await this.app.fileManager.processFrontMatter(c.file, (fm) => {
+        if (c === cal) {
+          fm.primary = true;
+          delete fm.align; delete fm.epoch_day;
+          if (present != null && fm.present == null) fm.present = present;
+        } else {
+          delete fm.primary;
+          if (c === old) { if (align) fm.align = align; delete fm.present; }
+          if (fixed.has(c)) fm.align = fixed.get(c);
+        }
       });
-      return t;
-    };
-    const n = y >= 1 ? between(1, y) : -between(y, 1);
-    model.before.set(y, n);
-    return n;
+    }
+    this.dropCalendar();
+    this.rerenderViews();
   }
 
-  /* The calendar in force in year y: { months, byLength, yearDays, weekdays, moons, holidays, modern }, or null
-     when a custom calendar has no months yet. Without y, the present year. */
+  /* Compatibility: the primary calendar's day count and year. */
+  daysBefore(y) { return this.primaryCal().daysBefore(y); }
   calendar(y) {
-    const model = this.calModel();
-    if (model.broken) return null;
-    if (y == null) { const now = this.latestPresent(); y = now ? now.y : 1; }
-    if (model.years.has(y)) return model.years.get(y);
-    let seg = model.monthSets[0];
-    for (const s of model.monthSets) if (s.from <= y) seg = s;
-    let ws = null;
-    for (const s of model.weekSets) if (s.from <= y) ws = s;
-
-    const src = seg.modern
-      ? MODERN_MONTHS.map(([name, days, aliases], i) => ({ name, aliases, days: i === 1 && isLeapYear(astroYear(y, model.eras.zero)) ? 29 : days }))
-      : seg.months;
-    const months = [];
-    let start = 0;
-    for (const m of src) { months.push({ name: m.name, aliases: m.aliases || [], days: m.days, start, index: months.length }); start += m.days; }
-    const byLength = [];
-    for (const m of months) for (const name of [m.name, ...m.aliases]) {
-      const esc = reEsc(name);
-      byLength.push({
-        name, m,
-        before: new RegExp('(\\d+)(?:st|nd|rd|th)?\\s+(?:of\\s+)?' + esc + '\\.?(?![\\p{L}])', 'iu'),
-        /* "July 4, 2026", "July 4th", "July 4 2026". No lookbehind: older iPad Safari can't compile it. */
-        after: new RegExp('(?:^|[^\\p{L}])' + esc + '\\.?\\s+(\\d{1,3})(?!\\d)(?:st|nd|rd|th)?(?=\\s*,|\\s+\\d|\\s*$)', 'iu'),
-        any: new RegExp('(?:^|[^\\p{L}])' + esc + '(?![\\p{L}])', 'iu'),
-      });
-    }
-    byLength.sort((a, b) => b.name.length - a.name.length);
-
-    const cal = {
-      months, byLength, yearDays: start, modern: !!seg.modern,
-      weekdays: ws ? ws.list : [],
-      wdBase: ws ? (ws.base != null ? ws.base : this.daysBefore(ws.from)) : 0,
-      moons: model.moons, holidays: [],
-    };
-    model.years.set(y, cal);
-
-    /* Holidays kept this year. The end year is the first year it is no longer held. */
-    for (const h of model.holidays) {
-      const doy = this.holidayDay(h, y, cal);
-      if (doy == null) continue;
-      const days = h.days || 1;
-      for (let i = 0; i < days && doy + i <= cal.yearDays; i++) {
-        const m = months.find((x) => doy + i > x.start && doy + i <= x.start + x.days);
-        cal.holidays.push({
-          month: m.index, day: doy + i - m.start,
-          name: i ? `${h.name} (day ${i + 1})` : h.name, base: h.name, note: h.note, doy: doy + i, part: i + 1, of: days,
-          from: h.from, to: h.to, lastHeld: h.lastHeld, file: h.file || null,
-        });
-      }
-    }
-    return cal;
+    const c = this.primaryCal();
+    if (y == null) { const now = this.latestPresent(); y = now ? this.inCal(now, c).y : 1; }
+    return c.year(y);
   }
 
-  /* Finds "12 Frostmoon", "Frostmoon 12, ...", "July 4th" or "2026-07-04" in a date and returns its day of the year, 1-based. */
-  dayOfYear(v, y) {
-    if (v == null || typeof v === 'number') return null;
-    const s = String(v);
-    if (y == null) y = parseYear(s, this.negEras());
-    const cal = y == null ? null : this.calendar(y);
-    if (!cal) return null;
-    const iso = s.match(/^\s*-?\d{1,6}-(\d{1,2})-(\d{1,2})(?!\d)/);
-    if (iso) {
-      const m = cal.months[Number(iso[1]) - 1];
-      if (m) { const day = Math.min(Math.max(Number(iso[2]), 1), m.days); return { doy: m.start + day, month: m.index, day, monthOnly: false }; }
-    }
-    for (const e of cal.byLength) {
-      const hit = s.match(e.before) || s.match(e.after);
-      if (!hit && !e.any.test(s)) continue;
-      const m = e.m;
-      const day = hit ? Math.min(Math.max(Number(hit[1]), 1), m.days) : 1;
-      return { doy: m.start + day, month: m.index, day, monthOnly: !hit };
-    }
-    return null;
-  }
-  /* A point in time: { y, d (day of year or null), raw }. Accepts numbers, free-text dates, or points. */
-  toPt(v) {
+  /* ---------- points in time ---------- */
+
+  /* A point in time: { y, d (day of year or null), raw, cal }. Accepts numbers, free-text dates, or points. The hint
+     (a calendar, or an entry whose calendar to use) decides plain dates that name no calendar of their own. */
+  toPt(v, hint) {
     if (v == null || v === '') return null;
-    if (typeof v === 'object' && 'y' in v) return v;
-    const y = parseYear(v, this.negEras());
-    if (y == null) return null;
-    const day = this.dayOfYear(v, y);
-    return { y, d: day && !day.monthOnly ? day.doy : null, raw: typeof v === 'number' ? this.fmtYear(v) : String(v).trim() };
+    const w = this.world();
+    if (typeof v === 'object' && !(v instanceof Date) && 'y' in v) return v.cal ? v : Object.assign({}, v, { cal: w.primary });
+    if (hint && !(hint instanceof Cal)) hint = hint instanceof TFile ? this.calFor(hint) : null;
+    if (typeof v === 'number') return (hint || w.primary).parse(v);
+    const det = detectCal(w, v instanceof Date ? v.toISOString().slice(0, 10) : String(v), hint);
+    const pt = det.cal.parse(det.text);
+    if (pt) pt.raw = String(v).trim();
+    return pt;
+  }
+  /* A point's day on the shared count. A point with no day sits on the first day of its year (or mid-year). */
+  gOf(pt, mid) {
+    if (!pt) return null;
+    const c = pt.cal || this.primaryCal();
+    if (pt.d != null) return c.epoch + c.toDay(pt.y, pt.d);
+    return c.epoch + c.daysBefore(pt.y) + (mid ? Math.floor(c.year(pt.y).yearDays / 2) : 0);
+  }
+  /* A point at a day on the shared count, in calendar cal. */
+  ptAt(g, cal) { const r = cal.fromDay(g - cal.epoch); return { y: r.y, d: r.d, cal, raw: '' }; }
+  /* The same moment in another calendar. A point with no day converts by the middle of its year. */
+  inCal(pt, cal) {
+    if (!pt || !cal) return pt;
+    const c = pt.cal || this.primaryCal();
+    if (c === cal) return pt.cal ? pt : Object.assign({}, pt, { cal });
+    const r = cal.fromDay(this.gOf(pt, pt.d == null) - cal.epoch);
+    return { y: r.y, d: pt.d != null ? r.d : null, raw: pt.raw, cal };
+  }
+  /* The same day written in every other calendar: [{ cal, pt, text, weekday }]. */
+  otherDates(pt) {
+    if (!pt || pt.d == null) return [];
+    const c = pt.cal || this.primaryCal();
+    return this.calendars().filter((x) => x !== c && !x.broken).map((x) => {
+      const q = this.inCal(pt, x);
+      return { cal: x, pt: q, text: x.dateText(q), weekday: x.weekday(q.y, q.d), inUse: this.inUse(x, this.gOf(pt)) };
+    });
+  }
+  /* A date written so it reads back into the same calendar: "3 Ember, 400 EK", or "Elven: 3 Ember, 400" when needed. */
+  dateLabel(pt) {
+    const c = pt.cal || this.primaryCal();
+    const t = c.dateText(pt);
+    const w = this.world();
+    return detectCal(w, t, null).cal === c ? t : `${c.label()}: ${t}`;
   }
   cmpPt(a, b) {
-    if (a.y !== b.y) return a.y - b.y;
+    const ca = a.cal || this.primaryCal(), cb = b.cal || this.primaryCal();
+    if (ca !== cb) {
+      if (a.d != null && b.d != null) return this.gOf(a) - this.gOf(b);
+      b = this.inCal(b, ca);
+    }
+    if (a.y !== b.y) return ca.astro(a.y) - ca.astro(b.y);
     return a.d != null && b.d != null ? a.d - b.d : 0;
   }
-  /* Full years from a to b, counting the day of the year when both dates have one. */
-  spanYears(a, b) {
-    a = this.toPt(a); b = this.toPt(b);
-    let n = this.yearsBetween(a.y, b.y);
+  /* Full years from a to b, counted in a's calendar, including the day of the year when both dates have one. */
+  spanYears(a, b, hint) {
+    a = this.toPt(a, hint); b = this.toPt(b, hint);
+    b = this.inCal(b, a.cal);
+    let n = a.cal.yearsBetween(a.y, b.y);
     if (a.d != null && b.d != null) {
       if (n > 0 && b.d < a.d) n -= 1;
       else if (n < 0 && b.d > a.d) n += 1;
     }
     return n;
   }
-  /* Days since the first day of year 1, for weekdays and moon phases. */
-  absDay(pt) {
-    if (!pt || pt.d == null || !this.calendar(pt.y)) return null;
-    return this.daysBefore(pt.y) + (pt.d - 1);
-  }
   weekdayOf(pt) {
-    const cal = pt && this.calendar(pt.y);
-    const n = this.absDay(pt);
-    if (!cal || n == null || !cal.weekdays.length) return null;
-    return cal.weekdays[mod(n - cal.wdBase, cal.weekdays.length)];
+    if (!pt || pt.d == null) return null;
+    return (pt.cal || this.primaryCal()).weekday(pt.y, pt.d);
   }
-  moonsOf(pt) {
-    const cal = pt && this.calendar(pt.y);
-    const n = this.absDay(pt);
-    if (!cal || n == null) return [];
-    return cal.moons.map((m) => {
-      const pos = mod(n - m.offset, m.cycle); // at the start of the day
+  /* Every moon's phase on a day of the shared count. */
+  moonsOn(g) {
+    return this.world().moons.map((m) => {
+      const pos = mod(g - m.offset, m.cycle); // at the start of the day
       const frac = mod(pos + 0.5, m.cycle) / m.cycle; // drawn as it looks at midday
       const i = Math.floor(frac * 8 + 0.5) % 8;
       /* The exact new, quarter or full moon happens during this day. */
@@ -2675,11 +3797,18 @@ class LoresmithPlugin extends Plugin {
       return { name: m.name, phase: MOON_PHASES[i], index: i, frac, exact, toFull: toFull >= Math.round(m.cycle) ? 0 : toFull };
     });
   }
-  holidayInfoOf(pt) {
-    const cal = pt && pt.d != null && this.calendar(pt.y);
-    if (!cal) return [];
-    return cal.holidays.filter((h) => h.doy === pt.d);
+  moonsOf(pt) { return pt && pt.d != null ? this.moonsOn(this.gOf(pt)) : []; }
+  /* Every holiday on a day of the shared count, from every calendar. */
+  holidaysOn(g) {
+    const out = [];
+    for (const c of this.calendars()) {
+      if (c.broken || !c.holidays.length || !this.inUse(c, g)) continue;
+      const r = c.fromDay(g - c.epoch);
+      for (const h of c.yearHolidays(r.y)) if (h.doy === r.d) out.push(h);
+    }
+    return dedupeHolidays(out);
   }
+  holidayInfoOf(pt) { return pt && pt.d != null ? this.holidaysOn(this.gOf(pt)) : []; }
   holidaysOf(pt) { return this.holidayInfoOf(pt).map((h) => h.name); }
   /* "Moonday, Selune full, Midwinter Feast" for a dated scene. */
   describeDay(pt) {
@@ -2692,61 +3821,76 @@ class LoresmithPlugin extends Plugin {
     out.push(...this.holidaysOf(pt));
     return out.join(', ');
   }
-  /* "6 October 2026" for a point on the calendar. */
-  dateText(pt) {
-    const cal = pt && pt.d != null && this.calendar(pt.y);
-    if (!cal) return pt ? this.fmtYear(pt.y) : '';
-    const m = cal.months.find((x) => pt.d > x.start && pt.d <= x.start + x.days) || cal.months[0];
-    return `${pt.d - m.start} ${m.name}${cal.modern && !this.eras().custom ? ' ' : ', '}${this.fmtYear(pt.y)}`;
-  }
+  /* "6 October 2026" for a point, in its own calendar. */
+  dateText(pt) { return pt ? (pt.cal || this.primaryCal()).dateText(pt) : ''; }
 
-  /* The calendar's own history, for the timeline and calendar: holidays starting and ending, calendar changes, notes. */
+  /* Each calendar's own history, for the timeline and calendar: holidays starting and ending, calendar changes, notes.
+     [{ pt, title, meta, file, who, cal }] */
   calendarHistory() {
-    const model = this.calModel();
+    const w = this.world();
+    const many = w.cals.length > 1;
     const out = [];
-    for (const h of model.holidays) {
-      const meta = [h.ruleText, h.note].filter(Boolean).join(', ');
-      const extra = { file: h.file || null, who: h.keptBy || [] };
-      if (h.from != null) out.push(Object.assign({ year: h.from, d: null, title: `${h.name} first held`, meta }, extra));
-      if (h.lastHeld != null) out.push(Object.assign({ year: h.lastHeld, d: null, title: `${h.name} last held`, meta }, extra));
-      else if (h.to != null) out.push(Object.assign({ year: h.to, d: null, title: `${h.name} no longer held`, meta }, extra));
-    }
-    for (const s of model.monthSets) {
-      if (s.from === -Infinity) continue;
-      out.push({ year: s.from, d: null, title: s.modern ? 'The modern calendar is adopted' : `A new calendar: ${s.months.length} months`, meta: s.modern ? '' : s.months.map((m) => m.name).join(', ') });
-    }
-    for (const s of model.weekSets) {
-      if (s.from === -Infinity) continue;
-      out.push({ year: s.from, d: null, title: `A new week: ${s.list.length} days`, meta: s.list.join(', ') });
-    }
-    for (const n of model.notes) {
-      const pt = this.toPt(n.when);
-      if (pt) out.push({ year: pt.y, d: pt.d, title: n.text, meta: n.when !== String(pt.y) ? n.when : '', when: n.when });
+    for (const c of w.cals) {
+      if (c.broken) continue;
+      const tag = (t) => (many ? [c.name, t].filter(Boolean).join(', ') : t);
+      const at = (y, d) => ({ y, d: d == null ? null : d, cal: c, raw: '' });
+      for (const h of c.holidays) {
+        if (h.file && h.obs > 0) continue; /* a holiday kept on several calendars starts and ends once */
+        const meta = tag([h.ruleText, h.note].filter(Boolean).join(', '));
+        const extra = { file: h.file || c.file, who: h.keptBy || [], cal: c };
+        if (h.fromG != null) out.push(Object.assign({ pt: this.ptAt(h.fromG, c), title: `${h.name} first held`, meta }, extra));
+        else if (h.from != null) out.push(Object.assign({ pt: at(h.from), title: `${h.name} first held`, meta }, extra));
+        if (h.toG != null) out.push(Object.assign({ pt: this.ptAt(h.toG, c), title: `${h.name} last held`, meta }, extra));
+        else if (h.lastHeld != null) out.push(Object.assign({ pt: at(h.lastHeld), title: `${h.name} last held`, meta }, extra));
+        else if (h.to != null) out.push(Object.assign({ pt: at(h.to), title: `${h.name} no longer held`, meta }, extra));
+      }
+      if (Number.isFinite(c.useFrom)) out.push({ pt: this.ptAt(c.useFrom, c), title: `${cap(c.the())} comes into use`, meta: '', file: c.file, who: c.model.keptBy, cal: c });
+      if (Number.isFinite(c.useUntil)) out.push({ pt: this.ptAt(c.useUntil, c), title: `${cap(c.the())} falls out of use`, meta: '', file: c.file, who: c.model.keptBy, cal: c });
+      if (c.eras.custom) {
+        c.eras.list.forEach((e, i) => {
+          const st = c.eras.st[i];
+          if (i === 0 || st == null || !Number.isFinite(st)) return;
+          const a = c.ageOf(st);
+          out.push({ pt: at(st, 1), title: `${many ? c.name + ': t' : 'T'}he ${a.label} begins`, meta: c.fmtYear(st), file: c.file, who: [], cal: c, age: true });
+        });
+      }
+      for (const s of c.monthSets) {
+        if (s.from === -Infinity) continue;
+        out.push({ pt: at(s.from, 1), title: s.modern ? `${many ? c.name + ': t' : 'T'}he modern calendar is adopted` : `${many ? c.name + ': a' : 'A'} new calendar of ${s.months.length} months`, meta: s.modern ? '' : s.months.map((m) => m.name).join(', '), file: c.file, who: [], cal: c });
+      }
+      for (const s of c.weekSets) {
+        if (s.from === -Infinity) continue;
+        out.push({ pt: at(s.from, 1), title: `${many ? c.name + ': a' : 'A'} new week of ${s.list.length} days`, meta: s.list.join(', '), file: c.file, who: [], cal: c });
+      }
+      for (const n of c.notes) {
+        const pt = c.parse(n.when);
+        if (pt) out.push({ pt, title: n.text, meta: tag(n.when !== String(pt.y) ? n.when : ''), when: n.when, file: c.file, who: [], cal: c });
+      }
     }
     return out;
   }
 
-  /* "Now" in the world. The calendar note's present date; or today, on the modern calendar with modern eras,
-     as long as nothing in the project has a date of its own. */
-  explicitPresent() { return this.toPt(this.calModel().present); }
+  /* "Now" in the world. The primary calendar note's present date; or today, on a modern primary calendar with modern
+     eras, as long as nothing in the project has a date of its own. */
+  explicitPresent() { return this.toPt(this.world().present); }
   defaultPresent() {
-    const model = this.calModel();
-    if (model.custom || model.eras.custom) return null;
+    const c = this.primaryCal();
+    if (!c.modern || c.eras.custom) return null;
     const t = new Date();
-    return this.toPt(`${t.getDate()} ${MODERN_MONTHS[t.getMonth()][0]} ${t.getFullYear()}`);
+    return this.toPt(`${t.getDate()} ${MODERN_MONTHS[t.getMonth()][0]} ${t.getFullYear()}`, c);
   }
   /* The latest story, chapter or scene date in the project, or null. Kept until a note changes. */
   scanPresent() {
     if (this._scan !== undefined && this._scanKey === this.settings.activeProject) return this._scan;
     let best = null;
-    const take = (v) => { const p = this.toPt(v); if (p && (!best || this.cmpPt(p, best) > 0)) best = p; };
+    const take = (v, f) => { const p = this.toPt(v, f); if (p && (!best || this.cmpPt(p, best) > 0)) best = p; };
     const root = this.projectPath();
     if (root) {
       for (const f of this.app.vault.getMarkdownFiles()) {
         if (!f.path.startsWith(root + '/')) continue;
         const fm = this.fm(f);
-        if (fm.present_year != null) take(fm.present_year);
-        if (fm.chapter_years && typeof fm.chapter_years === 'object') for (const v of Object.values(fm.chapter_years)) take(v);
+        if (fm.present_year != null) take(fm.present_year, f);
+        if (fm.chapter_years && typeof fm.chapter_years === 'object') for (const v of Object.values(fm.chapter_years)) take(v, f);
       }
     }
     this._scan = best;
@@ -2754,16 +3898,16 @@ class LoresmithPlugin extends Plugin {
     return best;
   }
   projectPresent() { return this.explicitPresent() || (this.scanPresent() ? null : this.defaultPresent()); }
-  storyPresent(story) { return story ? this.toPt(this.fm(story).present_year) : null; }
+  storyPresent(story) { return story ? this.toPt(this.fm(story).present_year, story) : null; }
   chapterPresent(story, chapter) {
     const map = story && this.fm(story).chapter_years;
-    return map && typeof map === 'object' ? this.toPt(map[chapter]) : null;
+    return map && typeof map === 'object' ? this.toPt(map[chapter], story) : null;
   }
   /* When a scene (or story) takes place: scene, then its chapter, then the story, then the project. */
   presentOf(file) {
     const story = this.storyFor(file);
     if (file !== story) {
-      const own = this.toPt(this.fm(file).present_year);
+      const own = this.toPt(this.fm(file).present_year, file);
       if (own) return own;
       if (story && file.parent && file.parent.parent === story.parent) {
         const ch = this.chapterPresent(story, file.parent.name);
@@ -2779,29 +3923,70 @@ class LoresmithPlugin extends Plugin {
     if (scan && (!best || this.cmpPt(scan, best) > 0)) best = scan;
     return best || this.defaultPresent();
   }
-  /* "Age 34 in 1023 AC", "Died aged 41", "Not born yet in 990 AC", or null with no birth year. */
-  ageText(fm, at) {
-    const born = this.toPt(fm.born);
+  /* "Age 34 in 1023 AC", "Died aged 41", "Not born yet in 990 AC", or null with no birth year. Ages count in the
+     calendar the birth date is written in. hint: the character (or a calendar) for dates that name no calendar. */
+  ageText(fm, at, hint) {
+    const born = this.toPt(fm.born, hint);
     if (!born) return null;
-    const died = this.toPt(fm.died);
-    at = this.toPt(at);
+    const died = this.toPt(fm.died, hint);
+    at = this.toPt(at, hint);
     if (died && (!at || this.cmpPt(died, at) <= 0)) return `Died aged ${this.spanYears(born, died)}`;
     if (!at) return null;
-    if (this.cmpPt(at, born) < 0) return `Not born yet in ${this.fmtYear(at.y)}`;
-    return `Age ${this.spanYears(born, at)} in ${this.fmtYear(at.y)}`;
+    if (this.cmpPt(at, born) < 0) return `Not born yet in ${at.cal.yearText(at.y, at.d)}`;
+    return `Age ${this.spanYears(born, at)} in ${at.cal.yearText(at.y, at.d)}`;
   }
   /* Short form for scene lists: { text: 'age 34' } or a warning when the scene falls outside their life. */
-  ageShort(fm, at) {
-    const born = this.toPt(fm.born);
-    at = this.toPt(at);
+  ageShort(fm, at, hint) {
+    const born = this.toPt(fm.born, hint);
+    at = this.toPt(at, hint);
     if (!born || !at) return null;
-    const died = this.toPt(fm.died);
+    const died = this.toPt(fm.died, hint);
     if (this.cmpPt(at, born) < 0) return { text: 'not born yet', warn: true };
     if (died && this.cmpPt(at, died) > 0) return { text: 'after death', warn: true };
     return { text: `age ${this.spanYears(born, at)}`, warn: false };
   }
-  agoText(from, at) {
-    from = this.toPt(from); at = this.toPt(at);
+  /* When an event starts and ends: { start, end } as points (either can be null). The end can leave out its year
+     ("17 Haring"): it's then the next such day on or after the start. Older notes' Sort year and Ends (a year) still
+     count when there's nothing better. */
+  eventSpan(f, fm) {
+    fm = fm || this.fm(f);
+    const c = this.calFor(f);
+    let start = this.toPt(fm.date, c);
+    const sort = numOrNull(fm.year);
+    if (sort != null && (!start || start.y !== sort)) start = { y: sort, d: start && start.y === sort ? start.d : null, cal: start ? start.cal : c, raw: String(sort) };
+    let end = null;
+    const et = fm.end != null && String(fm.end).trim() ? String(fm.end).trim() : '';
+    if (et) {
+      end = this.toPt(et, start ? start.cal : c);
+      /* A day and month with no year: the same year as the start, or the next if that day has already passed. */
+      const S = start ? start.cal : null;
+      const day = S ? S.dayOfYear(et, start.y) : null;
+      if (start && day && !day.monthOnly && (et.match(/\d+/g) || []).length === 1) {
+        let y = start.y;
+        if (start.d != null && day.doy < start.d) y = S.next(y);
+        end = { y, d: S.dayOfYear(et, y).doy, cal: S, raw: et };
+      }
+    } else if (numOrNull(fm.end_year) != null && start) end = { y: numOrNull(fm.end_year), d: null, cal: start.cal, raw: String(fm.end_year) };
+    if (start && end && this.cmpPt(end, start) < 0) end = null;
+    return { start, end };
+  }
+  /* "3 years, 12 days", "40 days", "about 120 years", from point a to point b, counted in a's calendar. */
+  durationText(a, b) {
+    if (!a || !b) return '';
+    const S = a.cal || this.primaryCal();
+    if (a.d != null && b.d != null) {
+      const days = this.gOf(b) - this.gOf(a) + 1;
+      const yrs = this.spanYears(a, b);
+      if (yrs < 1) return `${fmtNum(days)} day${days === 1 ? '' : 's'}`;
+      const anniv = this.gOf({ y: S.unastro(S.astro(a.y) + yrs), d: Math.min(a.d, S.year(S.unastro(S.astro(a.y) + yrs)).yearDays), cal: S });
+      const rest = this.gOf(b) - anniv + 1;
+      return `${fmtNum(yrs)} year${yrs === 1 ? '' : 's'}${rest > 0 ? `, ${fmtNum(rest)} day${rest === 1 ? '' : 's'}` : ''}`;
+    }
+    const yrs = Math.abs(this.spanYears(a, b));
+    return yrs ? `about ${fmtNum(yrs)} year${yrs === 1 ? '' : 's'}` : 'under a year';
+  }
+  agoText(from, at, hint) {
+    from = this.toPt(from, hint); at = this.toPt(at, hint);
     if (!from || !at) return '';
     const d = this.spanYears(from, at);
     if (d === 0) return 'this year';
@@ -3059,7 +4244,7 @@ class LoresmithPlugin extends Plugin {
     if (e.former) return 'former';
     const neg = this.negEras();
     const g = this.graph();
-    if (g.now === undefined) g.now = this.latestPresent();
+    if (g.now === undefined) g.now = this.inCal(this.latestPresent(), this.primaryCal());
     const now = g.now;
     const s = e.start ? parseYear(e.start, neg) : null;
     const en = e.end ? parseYear(e.end, neg) : null;
@@ -4277,6 +5462,66 @@ class LoresmithPlugin extends Plugin {
     }).open();
   }
   /* Menu: move this species, creature or plant to one of the other two. */
+  /* ---------- places: nations, regions, settlements, locations ---------- */
+
+  /* A guess at what kind of place a location really is, from its Type and its name. */
+  guessPlace(f) {
+    const fm = this.fm(f);
+    const test = (t) => {
+      t = String(t || '').toLowerCase();
+      if (/\b(kingdom|empire|realm|republic|nation|dominion|principality|grand duchy|city-state|confedera\w*|federation|sultanate|khanate|caliphate|theocracy|imperium|commonwealth|tribal lands|clan lands)\b/.test(t)) return 'nation';
+      if (/\b(city|town|village|hamlet|capital|port|harbou?r|fort|fortress|outpost|settlement|camp|stronghold|citadel|metropolis|borough|district|quarter|ward)\b/.test(t)) return 'settlement';
+      if (/\b(continent|region|province|county|shire|forest|woods?|mountains?|range|hills|desert|sea|ocean|lake|river|island|isles?|archipelago|valley|plains?|steppes?|swamp|marsh|fen|coast|wilds|wastes|tundra|peninsula|bay|gulf|highlands|lowlands|badlands|jungle|frontier)\b/.test(t)) return 'region';
+      return null;
+    };
+    return test(fm.kind) || test(f.basename) || 'location';
+  }
+  placeMenu(e, f, after) {
+    const from = this.typeOf(f);
+    const m = new Menu();
+    for (const to of PLACES) {
+      if (to === from) continue;
+      addMenuItem(m, `Make it a ${TYPES[to].label.toLowerCase()}`, TYPES[to].icon, async () => {
+        const nf = await this.convertPlace(f, to);
+        new Notice(`${f.basename} is now a ${TYPES[to].label.toLowerCase()}.`);
+        if (after && nf) after(nf);
+      });
+    }
+    m.showAtMouseEvent(e);
+  }
+  /* Changes what kind of place an entry is: its type, its folder, and the odd field that has a different name. */
+  async convertPlace(f, to, quiet) {
+    const from = this.typeOf(f);
+    if (!PLACES.includes(from) || !PLACES.includes(to) || from === to) return f;
+    await this.app.fileManager.processFrontMatter(f, (fm) => {
+      fm.type = to;
+      if (fm.lore) fm.lore = to;
+      if (fm.tags != null) fm.tags = toArr(fm.tags).map((t) => (cleanTag(t).toLowerCase() === from ? to : t));
+      /* A settlement "part of" a nation belongs to it; a nation can only be part of another nation. */
+      const par = fm.partOf ? this.resolveLink(fm.partOf, f) : null;
+      const pt = par ? this.typeOf(par) : null;
+      if (to === 'settlement' && pt === 'nation') { if (!fm.nation) fm.nation = fm.partOf; delete fm.partOf; }
+      if (from === 'settlement' && fm.nation && to !== 'settlement') { if (!fm.partOf) fm.partOf = fm.nation; delete fm.nation; }
+      if (to === 'nation' && par && pt !== 'nation') delete fm.partOf;
+      if (TYPES[to].details.length && !toArr(fm.details).length) fm.details = [...TYPES[to].details];
+    });
+    const proj = this.projectPath();
+    const oldBase = `${proj}/${TYPES[from].folder}`;
+    const newBase = `${proj}/${TYPES[to].folder}`;
+    const dir = f.parent ? f.parent.path : '';
+    const sub = dir === oldBase ? '' : dir.startsWith(oldBase + '/') ? dir.slice(oldBase.length + 1) : null;
+    if (sub !== null) {
+      const target = normalizePath(sub ? `${newBase}/${sub}` : newBase);
+      if (dir !== target) {
+        await this.ensureFolder(target);
+        await this.app.fileManager.renameFile(f, this.uniquePath(target, f.basename));
+      }
+    }
+    this.dropGraph();
+    if (!quiet) this.refreshOverviews();
+    return f;
+  }
+
   convertMenu(e, f, after) {
     const from = this.typeOf(f);
     const m = new Menu();
@@ -4418,7 +5663,7 @@ class LoresmithPlugin extends Plugin {
      a place under the place it's part of. */
   nestParent(f, type) {
     if (TAXA.includes(type)) return this.taxonParent(f);
-    if (type === 'organization' || type === 'location') {
+    if (type === 'organization' || PLACES.includes(type)) {
       const d = this.resolveLink(this.fm(f).partOf, f);
       return d && d !== f && this.typeOf(d) === type ? d : null;
     }
@@ -4626,6 +5871,7 @@ class LoresmithPlugin extends Plugin {
   /* ---------- creation ---------- */
 
   promptCreate(type, preset) {
+    if (type === 'calendar') { if (this.projectPath()) this.newCalendarFlow(); else new Notice('Create a project first.'); return; }
     if (!this.projectPath()) {
       new NameModal(this.app, { title: 'Start a project first', placeholder: 'Project name', cta: 'Create project' }, async (n) => {
         await this.createProject(n);
@@ -4638,6 +5884,11 @@ class LoresmithPlugin extends Plugin {
   }
 
   async createEntity(type, data = {}, open = true) {
+    if (type === 'calendar') {
+      const f = await this.createCalendar(data.name || 'New calendar', 'blank');
+      if (f && open) new CalendarEditorModal(this.app, this, f).open();
+      return f;
+    }
     const def = TYPES[type];
     const proj = this.projectPath();
     if (!def || !proj) { new Notice('Create a project first.'); return null; }
@@ -5136,6 +6387,7 @@ class LoresmithPlugin extends Plugin {
 
   async openEntity(file, typeHint) {
     const type = typeHint || this.typeOf(file);
+    if (type === 'calendar') { new CalendarEditorModal(this.app, this, file).open(); return; }
     if (type === 'outline') { const st = this.storyFor(file); return st ? this.openOutline(st) : this.openNote(file); }
     if (!type || type === 'scene' || (TYPES[type] && TYPES[type].plain)) return this.openNote(file);
     const ws = this.app.workspace;
@@ -5261,48 +6513,63 @@ class LoresmithPlugin extends Plugin {
 
   /* ---------- timeline ---------- */
 
+  /* Events, and optionally births, deaths, foundings and the calendars' history, in order. Each date is read in its
+     own calendar and shown in opts.cal (a calendar id; the primary by default): e.year, e.d and e.end are in e.cal. */
   timeline(idx, opts = {}) {
     idx = idx || this.index();
-    const neg = this.negEras();
+    /* opts.cal 'auto': each date shown in the calendar in use at the time. Sorting always runs on the shared count. */
+    const auto = opts.cal === 'auto';
+    const dc = auto ? this.primaryCal() : this.calById(opts.cal);
     const out = [];
+    const add = (e, pt, endPt) => {
+      const g = pt ? this.gOf(pt, pt.d == null) : null;
+      const sc = auto && g != null ? this.calAt(g) : dc;
+      const q = pt ? this.inCal(pt, sc) : null;
+      const s = pt ? this.inCal(pt, dc) : null;
+      const en = endPt ? this.inCal(endPt, sc) : null;
+      out.push(Object.assign(e, { pt, endPt: endPt || null, cal: sc, year: q ? q.y : null, d: q ? q.d : null, end: en ? en.y : null, endD: en ? en.d : null, g, sy: s ? s.y : null }));
+    };
     for (const f of idx.event) {
       const fm = this.fm(f);
-      const year = numOrNull(fm.year) ?? parseYear(fm.date, neg);
-      const pt = this.toPt(fm.date);
-      out.push({
-        file: f, kind: 'event', title: f.basename, year, d: pt && pt.y === year ? pt.d : null, end: numOrNull(fm.end_year),
-        when: fm.date ? String(fm.date) : '', era: fm.era ? String(fm.era) : '',
+      const { start, end } = this.eventSpan(f, fm);
+      add({
+        file: f, kind: 'event', title: f.basename,
+        when: [fm.date, end ? end.raw : ''].filter(Boolean).map(String).join(' – '), era: fm.era ? String(fm.era) : '',
         sub: fm.kind ? String(fm.kind) : '',
         where: fm.location || null,
         who: toArr(fm.participants), arcs: toArr(fm.arcs),
-      });
+        lasted: start && end ? this.durationText(start, end) : '',
+      }, start, end);
     }
     if (opts.births) {
       for (const c of idx.character) {
         const fm = this.fm(c);
-        const b = this.toPt(fm.born), dd = this.toPt(fm.died);
-        if (b) out.push({ file: c, kind: 'birth', title: `${c.basename} is born`, year: b.y, d: b.d, when: String(fm.born), who: [], arcs: [], where: fm.birthplace || null });
-        if (dd) out.push({ file: c, kind: 'death', title: `${c.basename} dies`, year: dd.y, d: dd.d, when: String(fm.died), who: [], arcs: [] });
+        const b = this.toPt(fm.born, c), dd = this.toPt(fm.died, c);
+        if (b) add({ file: c, kind: 'birth', title: `${c.basename} is born`, when: String(fm.born), who: [], arcs: [], where: fm.birthplace || null }, b);
+        if (dd) add({ file: c, kind: 'death', title: `${c.basename} dies`, when: String(fm.died), who: [], arcs: [] }, dd);
       }
     }
     if (opts.foundings) {
-      for (const o of idx.organization) {
+      for (const o of [...idx.organization, ...idx.nation, ...idx.settlement]) {
         const fm = this.fm(o);
-        const fd = this.toPt(fm.founded);
-        if (fd) out.push({ file: o, kind: 'founding', title: `${o.basename} is founded`, year: fd.y, d: fd.d, when: String(fm.founded), who: [], arcs: [], where: fm.headquarters || null });
+        const fd = this.toPt(fm.founded, o);
+        if (fd) add({ file: o, kind: 'founding', title: `${o.basename} is founded`, when: String(fm.founded), who: [], arcs: [], where: fm.headquarters || fm.capital || fm.partOf || null }, fd);
+        const end = this.toPt(fm.dissolved, o);
+        if (end) add({ file: o, kind: 'death', title: `${o.basename} falls`, when: String(fm.dissolved), who: [], arcs: [], where: null }, end);
       }
     }
     if (opts.calendar) {
-      const note = this.calNoteFile();
       for (const h of this.calendarHistory()) {
-        out.push({ file: h.file || note, kind: 'calendar', title: h.title, year: h.year, d: h.d, when: h.meta || '', who: h.who || [], arcs: [], where: null, sub: '' });
+        add({ file: h.file || null, kind: 'calendar', title: h.title, when: h.meta || '', who: h.who || [], arcs: [], where: null, sub: '' }, h.pt);
       }
     }
     const rank = { birth: 0, founding: 1, calendar: 2, event: 3, death: 4 };
     out.sort((a, b) => {
       if (a.year == null || b.year == null) return (a.year == null) - (b.year == null) || natural(a.title, b.title);
-      const days = a.d != null && b.d != null ? a.d - b.d : 0;
-      return (a.year - b.year) || days || (rank[a.kind] - rank[b.kind]) || natural(a.title, b.title);
+      const yd = a.sy - b.sy;
+      if (yd) return yd;
+      const days = a.d != null && b.d != null ? a.g - b.g : 0;
+      return days || (rank[a.kind] - rank[b.kind]) || natural(a.title, b.title);
     });
     return out;
   }
@@ -5498,7 +6765,7 @@ class OverviewView extends ItemView {
         item('timeline', 'Timeline', 'history', null, 'yellow');
         item('calendar', 'Calendar', 'calendar-days', null, 'yellow');
       }
-      for (const [k, d] of Object.entries(TYPES)) if (d.group === g) item(k, d.plural, d.icon, idx[k].length, d.color);
+      for (const [k, d] of Object.entries(TYPES)) if (d.group === g && !d.special) item(k, d.plural, d.icon, idx[k].length, d.color);
     }
   }
 
@@ -5843,6 +7110,7 @@ class OverviewView extends ItemView {
       this.groupPicker(tools, type);
       if (type === 'event') textBtn(tools, 'Timeline', () => this.goto('timeline'));
       if (type === 'holiday') textBtn(tools, 'Calendar', () => this.goto('calendar'));
+      if (type === 'location' && idx.location.length) textBtn(tools, 'Sort into nations, regions…', () => new PlaceSorterModal(this.app, this.plugin).open());
     };
     const el = this.panel(body, {
       title: def.plural, count: idx[type].length, color: def.color, search: true,
@@ -5901,6 +7169,7 @@ class OverviewView extends ItemView {
       if (!def.plain) addMenuItem(m, 'Open as note', 'file-text', () => p.openNote(f));
       addMenuItem(m, 'Move to folder…', 'folder-input', () => p.promptMoveToFolder(f, type));
       if (TAXA.includes(type)) addMenuItem(m, 'Move to Species, Bestiary or Flora…', 'arrow-right-left', () => p.convertMenu(e, f));
+      if (PLACES.includes(type)) addMenuItem(m, 'Change kind of place…', 'arrow-right-left', () => p.placeMenu(e, f));
       m.addSeparator();
       addMenuItem(m, 'Delete', 'trash-2', () => p.confirmDelete(f, def.label.toLowerCase()), true);
       m.showAtMouseEvent(e);
@@ -5958,7 +7227,7 @@ class OverviewView extends ItemView {
       head.createSpan({ cls: 'ls-card-title', text: f.basename });
       const sub = this.subtitle(f, type);
       if (sub) card.createDiv({ cls: 'ls-card-sub', text: sub });
-      const snip = snippetOf(texts[i]);
+      const snip = type === 'calendar' ? '' : snippetOf(texts[i]);
       card.createDiv({ cls: 'ls-card-snippet' + (snip ? '' : ' is-empty'), text: snip || 'Nothing written yet.' });
       const tags = p.tagsOf(f);
       if (tags.length) { const tg = card.createDiv('ls-tags'); for (const t of tags) tg.createSpan({ cls: 'ls-tag', text: t }); }
@@ -5988,9 +7257,21 @@ class OverviewView extends ItemView {
       return [cls, par && `Variant of ${par.basename}`, extra].filter(Boolean).map(String).join(', ');
     }
     if (type === 'organization' && fm.partOf) return [fm.kind, `part of ${name(fm.partOf)}`].filter(Boolean).map(String).join(', ');
+    if (type === 'nation') {
+      const ended = fm.dissolved ? `fell ${fm.dissolved}` : '';
+      return [fm.kind, fm.capital && `capital ${name(fm.capital)}`, fm.partOf && `under ${name(fm.partOf)}`, ended].filter(Boolean).map(String).join(', ');
+    }
+    if (type === 'settlement') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, fm.nation && name(fm.nation), fm.population && `pop. ${fm.population}`].filter(Boolean).map(String).join(', ');
+    if (type === 'region') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, fm.terrain].filter(Boolean).map(String).join(', ');
     if (type === 'location' && fm.partOf) return [fm.kind, `in ${name(fm.partOf)}`].filter(Boolean).join(', ');
     if (type === 'arc') return [fm.kind, fm.status].filter(Boolean).map(String).join(', ');
     if (type === 'event') return [fm.date, fm.kind].filter(Boolean).map(String).join(', ');
+    if (type === 'calendar') {
+      const c = p.world().byFile.get(f.path);
+      if (!c) return '';
+      const seg = c.monthSets[0];
+      return [c === p.primaryCal() ? 'Primary' : '', c.broken ? 'no months yet' : seg.modern ? 'Modern' : `${seg.months.filter((m) => m.days > 0).length} months, ${seg.base} days`, c.short].filter(Boolean).join(', ');
+    }
     if (type === 'holiday') return [fm.date, fm.kind, fm.last_held != null && String(fm.last_held).trim() ? `last held ${fm.last_held}` : ''].filter(Boolean).map(String).join(', ');
     if (type === 'word') {
       const langs = p.languageNames(f).join(', ');
@@ -6009,6 +7290,9 @@ class OverviewView extends ItemView {
   async renderTimeline(body, idx) {
     const p = this.plugin;
     const opts = p.settings.timeline;
+    const cals = p.calendars();
+    const auto = opts.cal === 'auto' && cals.length > 1;
+    const dc = p.calById(opts.cal);
     let focus = this.timelineFocus ? this.app.vault.getAbstractFileByPath(this.timelineFocus) : null;
     if (!(focus instanceof TFile)) focus = null;
 
@@ -6017,13 +7301,14 @@ class OverviewView extends ItemView {
       extra: (tools) => {
         const sel = tools.createEl('select', { cls: 'dropdown ls-tl-focus', attr: { 'aria-label': 'Show events for' } });
         sel.createEl('option', { text: 'Everyone', value: '' });
-        for (const [t, label] of [['character', 'Characters'], ['organization', 'Organizations'], ['arc', 'Plot arcs']]) {
+        for (const [t, label] of [['character', 'Characters'], ['organization', 'Organizations'], ['culture', 'Cultures'], ['arc', 'Plot arcs']]) {
           if (!idx[t].length) continue;
           const g = sel.createEl('optgroup', { attr: { label } });
           for (const f of idx[t]) g.createEl('option', { text: f.basename, value: f.path });
         }
         sel.value = focus ? focus.path : '';
         sel.addEventListener('change', () => { this.timelineFocus = sel.value || null; this.render(); });
+        if (cals.length > 1) this.calPicker(tools, 'Years in', dc, async (c) => { opts.cal = c === 'auto' ? 'auto' : c.id; await p.saveSettings(); this.render(); }, { auto: true, autoOn: auto });
         const toggle = (key, label) => {
           const b = textBtn(tools, label, async () => {
             opts[key] = !opts[key];
@@ -6038,7 +7323,7 @@ class OverviewView extends ItemView {
       },
     });
 
-    let entries = p.timeline(idx, opts);
+    let entries = p.timeline(idx, Object.assign({}, opts, { cal: auto ? 'auto' : dc.id }));
     if (focus) entries = entries.filter((e) => p.involves(e, focus));
     if (!entries.length) {
       return this.empty(el, focus
@@ -6048,21 +7333,39 @@ class OverviewView extends ItemView {
 
     const texts = new Map();
     await Promise.all(entries.filter((e) => e.kind === 'event').map(async (e) => texts.set(e.file, snippetOf(await this.app.vault.cachedRead(e.file)))));
-    const fmtYear = (y) => p.fmtYear(y);
     const name = (s, src) => { const d = p.resolveLink(s, src); return d ? d.basename : linkText(s); };
-    const now = p.latestPresent();
+    const nowRaw = p.latestPresent();
+    const nowCal = nowRaw && auto ? p.calAt(p.gOf(nowRaw)) : dc;
+    const now = nowRaw ? p.inCal(nowRaw, nowCal) : null;
 
     const tl = el.createDiv('ls-timeline');
     let era = null;
+    let age = null;
+    let lastCal = null;
     let undated = false;
     let nowShown = now == null;
     const nowMarker = () => {
       nowShown = true;
       const m = tl.createDiv('ls-tl-now');
-      m.createSpan({ cls: 'ls-tl-now-label', text: `Present day, ${now.raw}` });
+      m.createSpan({ cls: 'ls-tl-now-label', text: `Present day, ${now.raw || nowCal.dateText(now)}` });
     };
     for (const e of entries) {
-      if (!nowShown && (e.year == null || p.cmpPt({ y: e.year, d: e.d }, now) > 0)) nowMarker();
+      const ec = e.cal;
+      if (!nowShown && (e.year == null || p.cmpPt({ y: e.year, d: e.d, cal: ec }, now) > 0)) nowMarker();
+      if (auto && e.year != null && ec !== lastCal) {
+        lastCal = ec;
+        age = null;
+        const h = tl.createDiv({ cls: `ls-tl-era is-cal ls-c-${ec.color}`, text: `Reckoned by ${ec.the()}` });
+        const ut = p.useText(ec);
+        if (ut) h.createSpan({ cls: 'ls-tl-age-span', text: ut });
+      }
+      const ea = e.year != null && ec.eras.custom && ec.eras.list.length > 1 ? ec.ageOf(ec.numY(e.year, e.d)) : null;
+      if (ea && ea.label !== age) {
+        age = ea.label;
+        era = null;
+        const d = tl.createDiv({ cls: 'ls-tl-era is-age', text: ea.label });
+        d.createSpan({ cls: 'ls-tl-age-span', text: ea.len !== Infinity ? `${fmtNum(ea.len)} years` : 'still going' });
+      }
       if (e.year == null && !undated) {
         undated = true;
         tl.createDiv({ cls: 'ls-tl-era is-undated', text: 'No year yet' });
@@ -6072,13 +7375,21 @@ class OverviewView extends ItemView {
       }
       const row = tl.createDiv(`ls-tl-item ls-tl-${e.kind}`);
       const when = row.createDiv('ls-tl-when');
-      when.createDiv({ cls: 'ls-tl-year', text: e.year == null ? '?' : fmtYear(e.year) + (e.end != null ? `–${fmtYear(e.end)}` : '') });
-      if (e.year != null && now) when.createDiv({ cls: 'ls-tl-ago', text: p.agoText({ y: e.year, d: e.d }, now) });
+      const endY = e.end != null ? ec.yearText(e.end, e.endD) : '';
+      const startY = e.year == null ? '?' : ec.yearText(e.year, e.d);
+      when.createDiv({ cls: 'ls-tl-year', text: startY + (endY && endY !== startY ? `–${endY}` : '') });
+      if (e.year != null && now) when.createDiv({ cls: 'ls-tl-ago', text: p.agoText({ y: e.year, d: e.d, cal: ec }, now) });
       row.createDiv('ls-tl-dot');
       const card = row.createDiv('ls-tl-card');
       const head = card.createDiv('ls-tl-head');
       head.createSpan({ cls: 'ls-tl-title', text: e.title });
-      const meta = [e.when && e.when !== String(e.year) ? e.when : '', e.sub, e.where ? name(e.where, e.file) : ''].filter(Boolean);
+      /* Written in another calendar: say so, and give the day in the calendar being shown. */
+      if (e.pt && e.pt.cal !== ec && cals.length > 1) {
+        const tag = head.createSpan({ cls: `ls-cal-tag ls-c-${e.pt.cal.color}`, text: e.pt.cal.label() });
+        tag.setAttr('aria-label', `Written in ${e.pt.cal.the()}`);
+      }
+      const shown = e.pt && e.pt.cal !== ec && e.d != null ? ec.dateText({ y: e.year, d: e.d }) + (e.endD != null ? ` – ${ec.dateText({ y: e.end, d: e.endD })}` : '') : '';
+      const meta = [e.when && e.when !== String(e.year) ? e.when : '', shown && `${shown} (${ec.label()})`, e.lasted && `lasted ${e.lasted}`, e.sub, e.where ? name(e.where, e.file) : ''].filter(Boolean);
       if (meta.length) card.createDiv({ cls: 'ls-tl-meta', text: meta.join(', ') });
       if (e.kind === 'event') {
         const snip = texts.get(e.file);
@@ -6092,90 +7403,169 @@ class OverviewView extends ItemView {
           }
         }
       }
-      card.addEventListener('click', () => (e.kind === 'calendar' && !(e.file && p.typeOf(e.file) === 'holiday') ? p.openCalendarNote() : p.openEntity(e.file)));
+      card.addEventListener('click', () => {
+        if (!e.file) return p.editCalendar(e.pt && e.pt.cal);
+        if (e.kind === 'calendar' && p.typeOf(e.file) === 'calendar') return p.openNote(e.file);
+        p.openEntity(e.file);
+      });
     }
     if (!nowShown && entries.length) nowMarker();
   }
 
+  /* A dropdown of the project's calendars, each in its own color. */
+  calPicker(parent, label, current, onPick, opts = {}) {
+    const p = this.plugin;
+    const wrap = parent.createEl('label', { cls: `ls-cal-pick ls-c-${current ? current.color : 'base'}` });
+    wrap.createSpan({ cls: 'ls-cal-pick-label', text: label });
+    const sel = wrap.createEl('select', { cls: 'dropdown', attr: { 'aria-label': label } });
+    if (opts.none) sel.createEl('option', { text: opts.none, value: '' });
+    if (opts.auto) sel.createEl('option', { text: 'In use at the time', value: '__auto' });
+    for (const c of p.calendars()) {
+      if (opts.except && c === opts.except) continue;
+      sel.createEl('option', { text: c.name + (c === p.primaryCal() && !opts.none ? ' (primary)' : ''), value: c.id });
+    }
+    sel.value = opts.autoOn ? '__auto' : current ? current.id : '';
+    sel.addEventListener('change', () => onPick(sel.value === '__auto' ? 'auto' : sel.value ? p.calById(sel.value) : null));
+    return sel;
+  }
+
   /* ---------- calendar ---------- */
 
-  /* Everything that lands on a day of `year`, keyed by day of the year. Recurring items (birthdays,
-     anniversaries) repeat on the same day every later year. Scenes without their own date ride along
-     on their chapter's or story's date. */
-  calItems(idx, year) {
+  /* The calendar being shown, and the one shown alongside it (or null). */
+  calView() {
+    const p = this.plugin;
+    const cv = p.settings.calendarView;
+    let V = p.calById(cv.cal);
+    /* In use at the time: the calendar people used on the days being looked at. */
+    if (cv.cal === 'auto') {
+      const prev = this.calOn ? p.calById(this.calOn) : null;
+      let g = null;
+      if (prev && this.calYear != null && !prev.broken) {
+        const yr = prev.year(this.calYear);
+        const sel = this.calSel && this.calSel.y === this.calYear ? this.calSel.d : null;
+        const m = yr.months[Math.min(this.calMonth || 0, yr.months.length - 1)];
+        g = prev.epoch + prev.daysBefore(this.calYear) + (sel ? sel - 1 : cv.mode === 'month' && m ? m.start : Math.floor(yr.yearDays / 2));
+      } else { const now = p.latestPresent(); if (now) g = p.gOf(now); }
+      V = g == null ? p.primaryCal() : p.calAt(g);
+      if (g != null) this.calAnchor = g;
+    }
+    const C = cv.compare && cv.compare !== V.id ? p.calendars().find((c) => c.id === cv.compare) || null : null;
+    return { V, C: C && !C.broken ? C : null };
+  }
+
+  /* Everything that lands on a day of year `year` in calendar V, keyed by day of the year. Dates written in other
+     calendars land on the matching day. Recurring items (birthdays, anniversaries) repeat every year of the calendar
+     they were written in. Scenes without their own date ride along on their chapter's or story's date. */
+  calItems(idx, V, year) {
     const p = this.plugin;
     const byDay = new Map();
-    const put = (d, it) => { if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(it); };
-    const exact = (v) => { const pt = p.toPt(v); return pt && pt.d != null ? pt : null; };
-    const on = (v, it) => { const pt = exact(v); if (pt && pt.y === year) put(pt.d, it); };
+    const g0 = V.epoch + V.daysBefore(year);
+    const g1 = g0 + V.year(year).yearDays;
+    const inRange = (g) => g != null && g >= g0 && g < g1;
+    const put = (g, it) => {
+      if (!inRange(g)) return false;
+      const d = g - g0 + 1;
+      if (!byDay.has(d)) byDay.set(d, []);
+      byDay.get(d).push(it);
+      return true;
+    };
+    const exact = (v, hint) => { const pt = p.toPt(v, hint); return pt && pt.d != null ? pt : null; };
+    const on = (v, hint, it) => { const pt = exact(v, hint); if (pt) put(p.gOf(pt), Object.assign({ cal: pt.cal, raw: pt.raw }, it)); };
     const yrs = (n) => `${n} yr${n === 1 ? '' : 's'}`;
-    const yearly = (v, make, until) => {
-      const pt = exact(v);
-      if (!pt || year <= pt.y) return;
-      if (until && p.cmpPt({ y: year, d: pt.d }, until) > 0) return;
-      const n = p.yearsBetween(pt.y, year);
-      if (n > 0) put(pt.d, Object.assign({ recurring: true, round: n % 10 === 0 }, make(n)));
+    const yearly = (v, hint, make, until) => {
+      const pt = exact(v, hint);
+      if (!pt) return;
+      const C = pt.cal;
+      const m0 = C.monthAt(pt.y, pt.d);
+      const dom = pt.d - m0.start;
+      const ug = until ? p.gOf(until) : null;
+      const a = C.fromDay(g0 - C.epoch).y;
+      const b = C.fromDay(g1 - 1 - C.epoch).y;
+      for (let y = a, i = 0; C.astro(y) <= C.astro(b) && i < 400; y = C.next(y), i++) {
+        const n = C.yearsBetween(pt.y, y);
+        if (n <= 0) continue;
+        const yr = C.year(y);
+        const mm = yr.months.find((x) => x.name === m0.name) || yr.months[m0.index];
+        if (!mm) continue;
+        const g = C.epoch + C.toDay(y, mm.start + Math.min(dom, mm.days));
+        if (ug != null && g > ug) continue;
+        put(g, Object.assign({ recurring: true, round: n % 10 === 0, cal: C }, make(n)));
+      }
     };
 
     for (const f of idx.event) {
       const date = p.fm(f).date;
       const open = () => p.openEntity(f);
-      on(date, { key: 'event', kind: 'event', label: f.basename, open });
-      yearly(date, (n) => ({ key: 'anniversary', kind: 'event', label: `${f.basename} · ${yrs(n)}`, note: `${n} year${n === 1 ? '' : 's'} since`, open }));
+      const { start, end } = p.eventSpan(f);
+      if (start && start.d != null && end && end.d != null && p.gOf(end) > p.gOf(start)) {
+        /* Lasting more than a day: on every day it runs (up to a year and a half), else on its first and last days. */
+        const a = p.gOf(start), b = p.gOf(end);
+        const total = b - a + 1;
+        const lasted = p.durationText(start, end);
+        if (total <= 550) {
+          for (let g = Math.max(a, g0); g <= Math.min(b, g1 - 1); g++) {
+            put(g, { key: 'event', kind: 'event', label: f.basename, note: g === a ? `Begins · lasts ${lasted}` : g === b ? 'Ends' : `Day ${fmtNum(g - a + 1)} of ${fmtNum(total)}`, open, cal: start.cal, raw: start.raw, span: g === a ? 'first' : g === b ? 'last' : 'mid' });
+          }
+        } else {
+          put(a, { key: 'event', kind: 'event', label: `${f.basename} begins`, note: `Lasts ${lasted}`, open, cal: start.cal, raw: start.raw, span: 'first' });
+          put(b, { key: 'event', kind: 'event', label: `${f.basename} ends`, note: `After ${lasted}`, open, cal: end.cal, raw: end.raw, span: 'last' });
+        }
+      } else {
+        on(date, f, { key: 'event', kind: 'event', label: f.basename, open });
+        if (end && end.d != null) put(p.gOf(end), { key: 'event', kind: 'event', label: `${f.basename} ends`, open, cal: end.cal, raw: end.raw });
+      }
+      if (start && start.d != null) yearly(start, f, (n) => ({ key: 'anniversary', kind: 'event', label: `${f.basename} · ${yrs(n)}`, note: `${n} year${n === 1 ? '' : 's'} since`, open }));
     }
     for (const c of idx.character) {
       const fm = p.fm(c);
       const open = () => p.openEntity(c);
-      on(fm.born, { key: 'birth', kind: 'birth', label: `${c.basename} born`, open });
-      on(fm.died, { key: 'death', kind: 'death', label: `${c.basename} dies`, open });
-      yearly(fm.born, (n) => ({ key: 'birthday', kind: 'birth', label: `${c.basename} turns ${n}`, note: 'Birthday', open }), p.toPt(fm.died));
-      yearly(fm.died, (n) => ({ key: 'anniversary', kind: 'death', label: `† ${c.basename} · ${yrs(n)}`, note: `Died ${n} year${n === 1 ? '' : 's'} ago`, open }));
+      on(fm.born, c, { key: 'birth', kind: 'birth', label: `${c.basename} born`, open });
+      on(fm.died, c, { key: 'death', kind: 'death', label: `${c.basename} dies`, open });
+      yearly(fm.born, c, (n) => ({ key: 'birthday', kind: 'birth', label: `${c.basename} turns ${n}`, note: 'Birthday', open }), p.toPt(fm.died, c));
+      yearly(fm.died, c, (n) => ({ key: 'anniversary', kind: 'death', label: `† ${c.basename} · ${yrs(n)}`, note: `Died ${n} year${n === 1 ? '' : 's'} ago`, open }));
     }
-    for (const o of idx.organization) {
+    for (const o of [...idx.organization, ...idx.nation, ...idx.settlement]) {
       const founded = p.fm(o).founded;
       const open = () => p.openEntity(o);
-      on(founded, { key: 'founding', kind: 'founding', label: `${o.basename} founded`, open });
-      yearly(founded, (n) => ({ key: 'anniversary', kind: 'founding', label: `${o.basename} · ${yrs(n)}`, note: `Founded ${n} year${n === 1 ? '' : 's'} ago`, open }));
+      on(founded, o, { key: 'founding', kind: 'founding', label: `${o.basename} founded`, open });
+      yearly(founded, o, (n) => ({ key: 'anniversary', kind: 'founding', label: `${o.basename} · ${yrs(n)}`, note: `Founded ${n} year${n === 1 ? '' : 's'} ago`, open }));
     }
 
     /* Story and chapter dates. `hosts` remembers every story or chapter that has a date at all, so a scene
        inherits from the nearest one even when that date is in another year (then it is simply not shown). */
     const hosts = new Map();
+    const host = (v, story, label, note, key) => {
+      const pt = p.toPt(v, story);
+      if (!pt) return;
+      const g = pt.d != null ? p.gOf(pt) : null;
+      const it = inRange(g) ? { key: 'story', kind: 'story', label, note, open: () => p.openChapters(story), scenes: [], cal: pt.cal, raw: pt.raw } : null;
+      if (it) put(g, it);
+      hosts.set(key, it);
+    };
     for (const s of idx.story) {
       const fm = p.fm(s);
-      const open = () => p.openChapters(s);
-      if (p.toPt(fm.present_year)) {
-        const sp = exact(fm.present_year);
-        const it = sp && sp.y === year ? { key: 'story', kind: 'story', label: s.basename, note: 'Story date', open, scenes: [] } : null;
-        if (it) put(sp.d, it);
-        hosts.set(s.path, it);
-      }
+      host(fm.present_year, s, s.basename, 'Story date', s.path);
       if (fm.chapter_years && typeof fm.chapter_years === 'object') {
-        for (const [ch, v] of Object.entries(fm.chapter_years)) {
-          if (!p.toPt(v)) continue;
-          const cp = exact(v);
-          const it = cp && cp.y === year ? { key: 'story', kind: 'story', label: `${s.basename}: ${ch}`, note: 'Chapter date', open, scenes: [] } : null;
-          if (it) put(cp.d, it);
-          hosts.set(`${s.path}#${ch}`, it);
-        }
+        for (const [ch, v] of Object.entries(fm.chapter_years)) host(v, s, `${s.basename}: ${ch}`, 'Chapter date', `${s.path}#${ch}`);
       }
     }
     for (const sc of idx.scene) {
       const fm = p.fm(sc);
       const st = p.storyFor(sc);
       const chapter = st && sc.parent && sc.parent.parent === st.parent ? sc.parent.name : null;
-      if (p.toPt(fm.present_year)) {
-        on(fm.present_year, { key: 'scene', kind: 'scene', label: sc.basename, note: st ? [st.basename, chapter].filter(Boolean).join(' · ') : '', open: () => p.openNote(sc) });
+      if (p.toPt(fm.present_year, sc)) {
+        on(fm.present_year, sc, { key: 'scene', kind: 'scene', label: sc.basename, note: st ? [st.basename, chapter].filter(Boolean).join(' · ') : '', open: () => p.openNote(sc) });
         continue;
       }
       if (!st) continue;
       const chKey = chapter ? `${st.path}#${chapter}` : null;
-      const host = chKey && hosts.has(chKey) ? hosts.get(chKey) : hosts.get(st.path);
-      if (host) host.scenes.push(sc);
+      const h = chKey && hosts.has(chKey) ? hosts.get(chKey) : hosts.get(st.path);
+      if (h) h.scenes.push(sc);
     }
 
     for (const h of p.calendarHistory()) {
-      if (h.year === year && h.d != null) put(h.d, { key: 'history', kind: 'calendar', label: h.title, note: 'Calendar history', open: () => p.openCalendarNote() });
+      if (h.pt.d == null) continue;
+      put(p.gOf(h.pt), { key: 'history', kind: 'calendar', label: h.title, note: 'Calendar history', cal: h.cal, open: () => (!h.file ? p.editCalendar(h.cal) : p.typeOf(h.file) === 'calendar' ? p.openNote(h.file) : p.openEntity(h.file)) });
     }
 
     const order = ['history', 'event', 'founding', 'birth', 'death', 'story', 'scene', 'birthday', 'anniversary'];
@@ -6185,155 +7575,272 @@ class OverviewView extends ItemView {
     return byDay;
   }
 
+  /* Holidays from every calendar that fall in year `year` of calendar V, keyed by V's day of the year. */
+  calHolidays(V, year) {
+    const p = this.plugin;
+    const out = new Map();
+    const g0 = V.epoch + V.daysBefore(year);
+    const g1 = g0 + V.year(year).yearDays;
+    for (const c of p.calendars()) {
+      if (c.broken || !c.holidays.length) continue;
+      const a = c.fromDay(g0 - c.epoch).y;
+      const b = c.fromDay(g1 - 1 - c.epoch).y;
+      for (let y = a, i = 0; c.astro(y) <= c.astro(b) && i < 400; y = c.next(y), i++) {
+        for (const h of c.yearHolidays(y)) {
+          const g = c.epoch + c.toDay(y, h.doy);
+          if (g < g0 || g >= g1 || !p.inUse(c, g)) continue;
+          const d = g - g0 + 1;
+          if (!out.has(d)) out.set(d, []);
+          out.get(d).push(h);
+        }
+      }
+    }
+    for (const [d, list] of out) out.set(d, dedupeHolidays(list.sort((a, b) => (a.cal === V ? 0 : 1) - (b.cal === V ? 0 : 1))));
+    return out;
+  }
+
   calShown(key) { return this.plugin.settings.calendarView.show[key] !== false; }
   async calSetMode(mode) {
     this.plugin.settings.calendarView.mode = mode;
     await this.plugin.saveSettings();
     this.render();
   }
-  calMonthOf(cal, d) {
-    const m = cal.months.find((x) => d > x.start && d <= x.start + x.days);
-    return m ? m.index : 0;
+  async calSetCal(key, cal) {
+    const cv = this.plugin.settings.calendarView;
+    cv[key] = cal === 'auto' ? 'auto' : cal ? cal.id : '';
+    await this.plugin.saveSettings();
+    this.render();
   }
-  calDateText(cal, pt) { return this.plugin.dateText(pt); }
+  holidayShown(h, V) {
+    if (!this.calShown('holiday')) return false;
+    return h.cal === V || this.calShown('foreign');
+  }
 
-  /* A holiday's name on the calendar; opens its entry (or the calendar note, for one written there). */
-  calHoliday(parent, h) {
+  /* A holiday's name on the calendar; opens its entry (or its calendar). Holidays of other calendars carry their color. */
+  calHoliday(parent, h, V) {
     const p = this.plugin;
-    const el = parent.createDiv({ cls: 'ls-cal-holiday is-link', text: h.name, attr: { 'aria-label': [h.name, h.note].filter(Boolean).join(' · ') } });
-    el.addEventListener('click', (e) => { e.stopPropagation(); if (h.file) p.openEntity(h.file); else p.openCalendarNote(); });
+    const foreign = h.cal && h.cal !== V;
+    const el = parent.createDiv({ cls: 'ls-cal-holiday is-link' + (foreign ? ` is-foreign ls-c-${h.cal.color}` : ''), text: h.name });
+    el.setAttr('aria-label', [h.name, foreign && `${h.cal.name} calendar`, h.note].filter(Boolean).join(' · '));
+    el.addEventListener('click', (e) => { e.stopPropagation(); if (h.file) p.openEntity(h.file); else p.editCalendar(h.cal); });
     return el;
   }
 
-  calChip(parent, it) {
+  calChip(parent, it, V) {
     const n = it.scenes ? it.scenes.length : 0;
     const chip = parent.createDiv({ cls: `ls-cal-item ls-tl-${it.kind}`, text: n ? `${it.label} (${n})` : it.label });
     if (it.recurring) chip.addClass('is-recurring');
     if (it.round) chip.addClass('is-round');
-    const tip = [it.label, it.note, n ? `${n} scene${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+    if (it.span) chip.addClass(`is-span is-span-${it.span}`);
+    const other = it.cal && V && it.cal !== V ? `${it.cal.name} calendar${it.raw ? `: ${it.raw}` : ''}` : '';
+    if (other) chip.addClass('is-foreign');
+    const tip = [it.label, it.note, other, n ? `${n} scene${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
     chip.setAttr('aria-label', tip);
     chip.addEventListener('click', (e) => { e.stopPropagation(); it.open(); });
     return chip;
   }
 
   /* One month as a grid of days. `big` is the month view; otherwise the compact year view. */
-  calGrid(parent, cal, m, byDay, big, onDay) {
+  calGrid(parent, V, m, ctx, big, onDay) {
     const p = this.plugin;
-    const year = this.calYear;
+    const year = ctx.B != null ? ctx.B : this.calYear;
     const now = this.calNow;
+    const yr = V.year(year);
     const grid = parent.createDiv('ls-cal-grid');
-    const cols = cal.weekdays.length || 7;
+    const cols = yr.weekdays.length || 7;
     grid.style.setProperty('--ls-cal-cols', String(cols));
-    if (cal.weekdays.length) {
-      const names = big ? cal.weekdays : shortNames(cal.weekdays);
-      cal.weekdays.forEach((w, i) => grid.createDiv({ cls: 'ls-cal-wd', text: names[i], attr: { 'aria-label': w } }));
+    if (yr.weekdays.length) {
+      const names = big ? yr.weekdays : shortNames(yr.weekdays);
+      yr.weekdays.forEach((w, i) => grid.createDiv({ cls: 'ls-cal-wd', text: names[i], attr: { 'aria-label': w } }));
     }
-    const first = p.weekdayOf({ y: year, d: m.start + 1 });
-    const lead = cal.weekdays.length ? Math.max(0, cal.weekdays.indexOf(first)) : 0;
+    const lead = yr.weekdays.length ? Math.max(0, V.weekdayIndex(year, m.start + 1)) : 0;
     for (let i = 0; i < lead; i++) grid.createDiv('ls-cal-day is-blank');
     const limit = big ? 5 : 3;
     const showMoons = this.calShown('moon');
+    const C = ctx.C;
     for (let day = 1; day <= m.days; day++) {
-      const pt = { y: year, d: m.start + day };
+      const doy = m.start + day;
+      const g = ctx.g0 + doy - 1;
       const cell = grid.createDiv('ls-cal-day');
-      if (now && now.y === year && now.d === pt.d) cell.addClass('is-now');
-      if (this.calSel && this.calSel.y === year && this.calSel.d === pt.d) cell.addClass('is-selected');
-      const holidays = p.holidayInfoOf(pt);
-      if (holidays.length && this.calShown('holiday')) cell.addClass('has-holiday');
+      if (now && now.y === year && now.d === doy) cell.addClass('is-now');
+      /* With the New Year partway through a month, days that belong to the year before or after are dimmed. */
+      if (ctx.numY != null && V.numY(year, doy) !== ctx.numY) cell.addClass('is-other-year');
+      if (this.calSel && this.calSel.y === year && this.calSel.d === doy) cell.addClass('is-selected');
+      const holidays = (ctx.hol.get(doy) || []).filter((h) => this.holidayShown(h, V));
+      if (holidays.length) cell.addClass('has-holiday');
       const top = cell.createDiv('ls-cal-num');
       top.createSpan({ text: String(day) });
+      /* The same day in the calendar shown alongside. */
+      if (C) {
+        const r = C.fromDay(g - C.epoch);
+        const cm = C.monthAt(r.y, r.d);
+        const cd = r.d - cm.start;
+        if (big) {
+          const t = cell.createDiv({ cls: `ls-cal-alt ls-c-${C.color}` + (cd === 1 ? ' is-start' : ''), text: cd === 1 ? `1 ${cm.name}${r.d === C.nyDoy(r.y) ? `, ${C.yearText(r.y, r.d)}` : ''}` : `${cd} ${cm.name.slice(0, 3)}` });
+          t.setAttr('aria-label', `${C.name}: ${C.dateText(r)}`);
+        } else if (cd === 1) {
+          cell.addClass('is-alt-start');
+          cell.setAttr('aria-label', `${C.name}: ${C.dateText(r)}`);
+          top.createSpan({ cls: `ls-cal-alt-mark ls-c-${C.color}`, text: cm.name.slice(0, 3) });
+        }
+      }
       if (showMoons) {
         const moons = top.createSpan('ls-cal-moons');
-        for (const mo of p.moonsOf(pt)) {
+        for (const mo of p.moonsOn(g)) {
           if (mo.exact != null) moonSvg(moons, mo.exact / 8, `${mo.name}: ${MOON_PHASES[mo.exact].toLowerCase()} moon`, 'is-exact');
           else moonSvg(moons, mo.frac, `${mo.name}: ${mo.phase.toLowerCase()}`);
         }
       }
-      if (this.calShown('holiday')) for (const h of holidays) this.calHoliday(cell, h);
-      const items = (byDay.get(pt.d) || []).filter((it) => this.calShown(it.key));
-      items.slice(0, limit).forEach((it) => this.calChip(cell, it));
+      for (const h of holidays) this.calHoliday(cell, h, V);
+      const items = (ctx.byDay.get(doy) || []).filter((it) => this.calShown(it.key));
+      items.slice(0, limit).forEach((it) => this.calChip(cell, it, V));
       if (items.length > limit) cell.createDiv({ cls: 'ls-cal-more', text: `+${items.length - limit} more` });
-      cell.addEventListener('click', () => onDay(pt.d));
+      cell.addEventListener('click', () => onDay(doy));
     }
   }
 
   async renderCalendar(body, idx) {
     const p = this.plugin;
     const cv = p.settings.calendarView;
+    const cals = p.calendars();
+    const { V, C } = this.calView();
     const mode = cv.mode;
-    const now = p.latestPresent();
+    const nowRaw = p.latestPresent();
+    const now = nowRaw ? p.inCal(nowRaw, V) : null;
     this.calNow = now;
+    /* Switching calendars keeps you on the same days. */
+    if (this.calOn !== V.id) {
+      if (this.calOn && this.calAnchor != null && !V.broken) {
+        const r = V.fromDay(this.calAnchor - V.epoch);
+        this.calYear = r.y;
+        this.calMonth = V.monthAt(r.y, r.d).index;
+        if (this.calSel) this.calSel = { y: r.y, d: r.d };
+      } else this.calYear = null;
+      this.calOn = V.id;
+    }
     if (this.calYear == null) {
       this.calYear = now ? now.y : 1;
-      const c0 = p.calendar(this.calYear);
-      if (c0 && now && now.d != null) this.calMonth = this.calMonthOf(c0, now.d);
+      if (now && now.d != null && !V.broken) this.calMonth = V.monthAt(now.y, now.d).index;
     }
-    /* Each year gets the calendar in force that year, so a calendar change shows up as you page through. */
-    const cal = p.calendar(this.calYear);
-    if (this.calMonth == null || (cal && this.calMonth >= cal.months.length)) this.calMonth = 0;
-    const skipZero = (y, dir) => (y === 0 && !p.eras().zero ? y + dir : y);
+    const yr = V.year(this.calYear);
+    if (this.calMonth == null) this.calMonth = 0;
+    if (this.calMonth >= yr.months.length) this.calMonth = yr.months.length - 1;
+    const skipZero = (y, dir) => (y === 0 && !V.zero ? y + dir : y);
     const stepYear = (dir) => { this.calYear = skipZero(this.calYear + dir, dir); this.calSel = null; this.render(); };
     const stepMonth = (dir) => {
       let mo = this.calMonth + dir;
       if (mo < 0) {
         this.calYear = skipZero(this.calYear - 1, -1);
-        const c = p.calendar(this.calYear);
-        mo = c ? c.months.length - 1 : 0;
-      } else if (mo >= cal.months.length) { mo = 0; this.calYear = skipZero(this.calYear + 1, 1); }
+        mo = V.year(this.calYear).months.length - 1;
+      } else if (mo >= yr.months.length) { mo = 0; this.calYear = skipZero(this.calYear + 1, 1); }
       this.calMonth = mo;
       this.render();
     };
-    const goNow = () => {
-      this.calYear = now.y;
-      const c = p.calendar(now.y);
-      if (now.d != null && c) { this.calMonth = this.calMonthOf(c, now.d); this.calSel = { y: now.y, d: now.d }; }
-      this.render();
+    const goTo = (pt) => {
+      const q = p.inCal(pt, V);
+      this.calYear = q.y;
+      if (q.d != null) { this.calMonth = V.monthAt(q.y, q.d).index; this.calSel = { y: q.y, d: q.d }; }
+      if (q.d != null && cv.mode !== 'month') this.calSetMode('month'); else this.render();
     };
-    const atNow = now && now.y === this.calYear && (mode === 'year' || now.d == null || !cal || this.calMonthOf(cal, now.d) === this.calMonth);
+    const atNow = now && now.y === this.calYear && (mode === 'year' || now.d == null || V.broken || V.monthAt(now.y, now.d).index === this.calMonth);
 
     const el = this.panel(body, {
-      title: 'Calendar', color: 'yellow',
+      title: cals.length > 1 ? `Calendar: ${V.name}${cv.cal === 'auto' ? ' (in use at the time)' : ''}` : 'Calendar', color: V.color,
       extra: (tools) => {
-        if (cal) {
+        if (cals.length > 1) {
+          this.calPicker(tools, 'Show', V, (c) => this.calSetCal('cal', c), { auto: true, autoOn: cv.cal === 'auto' });
+          this.calPicker(tools, 'Alongside', C, (c) => this.calSetCal('compare', c), { none: 'Nothing', except: V });
+        }
+        if (!V.broken) {
           const seg = tools.createDiv('ls-seg');
           for (const [m, ic, l] of [['year', 'calendar-range', 'Year'], ['month', 'calendar-days', 'Month']]) {
             const b = iconBtn(seg, ic, l, () => this.calSetMode(m));
             if (mode === m) b.addClass('is-active');
           }
         }
-        const month = mode === 'month' && cal;
+        const month = mode === 'month' && !V.broken;
         iconBtn(tools, 'chevron-left', month ? 'Previous month' : 'Previous year', () => (month ? stepMonth(-1) : stepYear(-1)));
         if (month) {
           const sel = tools.createEl('select', { cls: 'dropdown ls-cal-monthsel', attr: { 'aria-label': 'Month' } });
-          for (const m of cal.months) sel.createEl('option', { text: m.name, value: String(m.index) });
+          for (const m of yr.months) sel.createEl('option', { text: m.name, value: String(m.index) });
           sel.value = String(this.calMonth);
           sel.addEventListener('change', () => { this.calMonth = Number(sel.value); this.render(); });
         }
-        const yr = tools.createEl('input', { type: 'text', cls: 'ls-input ls-cal-year', attr: { 'aria-label': 'Year' } });
-        yr.value = p.fmtYear(this.calYear);
-        yr.addEventListener('change', () => { const y = parseYear(yr.value, p.negEras()); if (y != null) { this.calYear = y; this.render(); } });
+        const yi = tools.createEl('input', { type: 'text', cls: 'ls-input ls-cal-year', attr: { 'aria-label': 'Year' } });
+        yi.value = month ? V.yearText(this.calYear, (yr.months[this.calMonth] || yr.months[0]).start + 1) : V.yearText(this.calYear, V.nyDoy(this.calYear));
+        yi.addEventListener('change', () => { const y = V.yp(yi.value); if (y != null) { this.calYear = V.baseOfNum(y); this.calSel = null; this.render(); } });
         iconBtn(tools, 'chevron-right', month ? 'Next month' : 'Next year', () => (month ? stepMonth(1) : stepYear(1)));
-        if (now && !atNow) textBtn(tools, 'Present', goNow);
-        iconBtn(tools, 'pencil', 'Edit calendar note: months, holidays and history', () => p.openCalendarNote());
+        if (now && !atNow) textBtn(tools, 'Present', () => goTo(now));
+        const go = tools.createEl('input', { type: 'text', cls: 'ls-input ls-cal-go', attr: { placeholder: 'Go to a date…', 'aria-label': 'Go to a date, in any calendar' } });
+        go.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' || !go.value.trim()) return;
+          const pt = p.toPt(go.value.trim(), V);
+          if (!pt) { new Notice(`Can't read "${go.value}" as a date.`); return; }
+          if (pt.cal !== V && pt.d != null) new Notice(`${pt.cal.dateText(pt)} (${pt.cal.name}) is ${V.dateText(p.inCal(pt, V))} on ${V.the()}.`);
+          goTo(pt);
+        });
+        iconBtn(tools, 'pencil', `Edit ${V.the()}`, () => p.editCalendar(V));
+        iconBtn(tools, 'calendar-plus', 'New calendar', () => p.newCalendarFlow((f) => { cv.cal = f.path; p.saveSettings(); }), 'ls-add');
       },
     });
-    if (!cal) {
+    if (V.broken) {
       const box = el.createDiv('ls-empty');
-      box.createDiv({ text: 'Your custom calendar has no months yet. Add them to the Months section of the calendar note (one per line: name, number of days), or switch custom_calendar off to use the modern calendar.' });
-      textBtn(box, 'Open calendar note', () => p.openCalendarNote(), 'mod-cta');
+      box.createDiv({ text: `${cap(V.the())} has no months yet. Add them in the calendar editor, or switch it to the modern calendar.` });
+      textBtn(box, 'Edit calendar', () => p.editCalendar(V), 'mod-cta');
       return;
     }
+    {
+      const y0 = V.epoch + V.daysBefore(this.calYear), y1 = y0 + yr.yearDays - 1;
+      if (y1 < V.useFrom || y0 > V.useUntil) el.createDiv({ cls: 'ls-cal-warn', text: `${cap(V.the())} wasn't in use in ${V.fmtYear(this.calYear)} (${p.useText(V)}). Its holidays aren't shown.` });
+    }
+    if (V.alignError) el.createDiv({ cls: 'ls-cal-warn', text: `${V.name}: ${V.alignError}` });
+    else if (cals.length > 1) {
+      const un = cals.filter((c) => c.unaligned && !c.broken);
+      if (un.length) {
+        const w = el.createDiv({ cls: 'ls-cal-warn is-link', text: `Not lined up yet: ${un.map((c) => c.name).join(', ')}. Until you say where ${un.length === 1 ? 'it starts' : 'they start'}, year 1 is taken to begin on the same day as ${p.primaryCal().the()}. Tap to fix.` });
+        w.addEventListener('click', () => p.editCalendar(un[0]));
+      }
+    }
 
-    this.renderCalLegend(el, cal);
-    const byDay = this.calItems(idx, this.calYear);
+    const numYear = V.numY(this.calYear, mode === 'month' ? (yr.months[this.calMonth] || yr.months[0]).start + 1 : V.nyDoy(this.calYear));
+    const va = V.eras.custom ? V.ageOf(numYear) : null;
+    if (va) {
+      const line = el.createDiv('ls-cal-age');
+      line.createSpan({ cls: 'ls-cal-age-name', text: va.label });
+      line.createSpan({ cls: 'ls-muted', text: va.len !== Infinity ? `year ${fmtNum(numYear - va.start + 1)} of ${fmtNum(va.len)}` : '' });
+      if (C && C.eras.custom) { const ca = C.ageOf(C.fromDay((V.epoch + V.daysBefore(this.calYear)) - C.epoch).y); if (ca) line.createSpan({ cls: `ls-cal-tag ls-c-${C.color}`, text: `${C.label()}: ${ca.label}` }); }
+    }
+    this.renderCalLegend(el, V, C);
+    const ctx = {
+      g0: V.epoch + V.daysBefore(this.calYear),
+      byDay: this.calItems(idx, V, this.calYear),
+      hol: this.calHolidays(V, this.calYear),
+      C,
+    };
 
     if (mode === 'year') {
+      this.calAnchor = ctx.g0 + Math.floor(yr.yearDays / 2);
+      if (this.calSel && this.calSel.y === this.calYear) this.calAnchor = ctx.g0 + this.calSel.d - 1;
       const months = el.createDiv('ls-cal');
-      for (const m of cal.months) {
+      /* The months of the numbered year: from the New Year's month to the month before it comes round again. */
+      const parts = [];
+      if (V.ny) {
+        const B = this.calYear, B2 = V.next(B);
+        const n0 = V.nyDoy(B), n1 = V.nyDoy(B2);
+        const ctx2 = { B: B2, g0: V.epoch + V.daysBefore(B2), byDay: this.calItems(idx, V, B2), hol: this.calHolidays(V, B2), C };
+        ctx.B = B;
+        ctx.numY = ctx2.numY = V.numY(B, n0);
+        for (const m of yr.months) if (m.start + m.days >= n0) parts.push({ m, ctx });
+        for (const m of V.year(B2).months) if (m.start + 1 < n1) parts.push({ m, ctx: ctx2 });
+      } else for (const m of yr.months) parts.push({ m, ctx });
+      for (const { m, ctx: cx } of parts) {
         const box = months.createDiv('ls-cal-month');
-        const title = box.createDiv({ cls: 'ls-cal-title is-link', text: m.name, attr: { 'aria-label': `Open ${m.name}` } });
-        title.addEventListener('click', () => { this.calMonth = m.index; this.calSel = null; this.calSetMode('month'); });
-        this.calGrid(box, cal, m, byDay, false, (d) => {
+        const head = box.createDiv('ls-cal-title-row');
+        const title = head.createDiv({ cls: 'ls-cal-title is-link', text: m.name, attr: { 'aria-label': `Open ${m.name}` } });
+        title.addEventListener('click', () => { if (cx.B != null) this.calYear = cx.B; this.calMonth = m.index; this.calSel = null; this.calSetMode('month'); });
+        if (C) head.createDiv({ cls: `ls-cal-title-alt ls-c-${C.color}`, text: this.altRange(C, cx.g0 + m.start, cx.g0 + m.start + m.days - 1) });
+        this.calGrid(box, V, m, cx, false, (d) => {
+          if (cx.B != null) this.calYear = cx.B;
           this.calMonth = m.index;
           this.calSel = { y: this.calYear, d };
           this.calSetMode('month');
@@ -6342,20 +7849,33 @@ class OverviewView extends ItemView {
       return;
     }
 
-    const m = cal.months[this.calMonth];
+    const m = yr.months[this.calMonth];
+    this.calAnchor = this.calSel && this.calSel.y === this.calYear ? ctx.g0 + this.calSel.d - 1 : ctx.g0 + m.start;
+    if (C) el.createDiv({ cls: `ls-cal-alt-head ls-c-${C.color}`, text: `${C.name}: ${this.altRange(C, ctx.g0 + m.start, ctx.g0 + m.start + m.days - 1, true)}` });
     const wrap = el.createDiv('ls-cal-mv');
-    this.calGrid(wrap.createDiv('ls-cal-mv-grid'), cal, m, byDay, true, (d) => {
+    this.calGrid(wrap.createDiv('ls-cal-mv-grid'), V, m, ctx, true, (d) => {
       const same = this.calSel && this.calSel.y === this.calYear && this.calSel.d === d;
       this.calSel = same ? null : { y: this.calYear, d };
       this.render();
     });
     const side = wrap.createDiv('ls-cal-detail');
     const sel = this.calSel;
-    if (sel && sel.y === this.calYear && sel.d > m.start && sel.d <= m.start + m.days) this.renderCalDay(side, cal, sel, byDay);
-    else this.renderCalAgenda(side, cal, m, byDay);
+    if (sel && sel.y === this.calYear && sel.d > m.start && sel.d <= m.start + m.days) this.renderCalDay(side, V, { y: sel.y, d: sel.d, cal: V, raw: '' }, ctx);
+    else this.renderCalAgenda(side, V, m, ctx);
   }
 
-  renderCalLegend(el, cal) {
+
+  /* "Ember – Ash 400" (or "1 Ember – 12 Ash, 400 EK" in full) for the days g..h in calendar C. */
+  altRange(C, g, h, full) {
+    const a = C.fromDay(g - C.epoch), b = C.fromDay(h - C.epoch);
+    if (full) return `${C.dateText(a)} to ${C.dateText(b)}`;
+    const ma = C.monthAt(a.y, a.d).name, mb = C.monthAt(b.y, b.d).name;
+    const ya = C.yearText(a.y, a.d), yb = C.yearText(b.y, b.d);
+    if (ma === mb && ya === yb) return `${ma} ${ya}`;
+    return ya === yb ? `${ma} – ${mb} ${ya}` : `${ma} ${ya} – ${mb} ${yb}`;
+  }
+
+  renderCalLegend(el, V) {
     const p = this.plugin;
     const row = el.createDiv('ls-cal-legend');
     const kinds = [
@@ -6363,9 +7883,11 @@ class OverviewView extends ItemView {
       ['founding', 'Foundings', 'founding'], ['story', 'Stories & chapters', 'story'], ['scene', 'Scenes', 'scene'],
       ['birthday', 'Birthdays', 'birth', true], ['anniversary', 'Anniversaries', 'event', true],
     ];
-    if (p.calModel().holidays.length) kinds.push(['holiday', 'Holidays', 'holiday']);
-    if (p.calendarHistory().some((h) => h.d != null)) kinds.push(['history', 'Calendar history', 'calendar']);
-    if (cal.moons.length) kinds.push(['moon', 'Moons', 'moon']);
+    const cals = p.calendars();
+    if (cals.some((c) => c.holidays.length)) kinds.push(['holiday', 'Holidays', 'holiday']);
+    if (cals.some((c) => c !== V && c.holidays.length)) kinds.push(['foreign', 'Other calendars\' holidays', 'foreign']);
+    if (p.calendarHistory().some((h) => h.pt.d != null)) kinds.push(['history', 'Calendar history', 'calendar']);
+    if (p.world().moons.length) kinds.push(['moon', 'Moons', 'moon']);
     for (const [key, label, kind, recurring] of kinds) {
       const b = row.createEl('button', { cls: `ls-cal-key ls-tl-${kind}`, attr: { 'aria-pressed': String(this.calShown(key)) } });
       if (recurring) b.addClass('is-recurring');
@@ -6381,30 +7903,47 @@ class OverviewView extends ItemView {
     }
   }
 
-  renderCalDay(side, cal, pt, byDay) {
+  renderCalDay(side, V, pt, ctx) {
     const p = this.plugin;
-    const dateText = this.calDateText(cal, pt);
+    const dateText = V.dateText(pt);
+    const label = p.dateLabel(pt);
     const head = side.createDiv('ls-cal-detail-head');
     const t = head.createDiv('ls-cal-detail-titles');
     t.createDiv({ cls: 'ls-cal-detail-title', text: dateText });
-    const sub = [p.weekdayOf(pt), ...p.holidaysOf(pt)].filter(Boolean);
+    const sub = [V.weekday(pt.y, pt.d)].filter(Boolean);
     if (this.calNow && this.calNow.y === pt.y && this.calNow.d === pt.d) sub.push('Present');
     if (sub.length) t.createDiv({ cls: 'ls-muted', text: sub.join(' · ') });
     iconBtn(head, 'copy', 'Copy date', () => {
-      navigator.clipboard.writeText(dateText).then(() => new Notice(`Copied "${dateText}"`), () => new Notice('Could not copy the date.'));
+      navigator.clipboard.writeText(label).then(() => new Notice(`Copied "${label}"`), () => new Notice('Could not copy the date.'));
     });
     iconBtn(head, 'x', 'Back to the month', () => { this.calSel = null; this.render(); });
 
-    const hols = this.calShown('holiday') ? p.holidayInfoOf(pt) : [];
+    /* The same day in every other calendar; tap one to switch to it. */
+    const others = p.otherDates(pt);
+    if (others.length) {
+      const box = side.createDiv('ls-cal-detail-others');
+      for (const o of others) {
+        const r = box.createDiv({ cls: `ls-cal-other ls-c-${o.cal.color}` + (o.inUse ? '' : ' is-unused'), attr: { 'aria-label': `Show ${o.cal.the()}${o.inUse ? '' : ' (not in use on this day)'}` } });
+        r.createSpan('ls-cal-other-dot');
+        const tx = r.createDiv('ls-cal-other-text');
+        tx.createDiv({ cls: 'ls-cal-other-name', text: o.cal.name + (o.inUse ? '' : ' · not in use') });
+        tx.createDiv({ text: [o.weekday, o.text].filter(Boolean).join(', ') });
+        const hs = o.cal.yearHolidays(o.pt.y).filter((h) => h.doy === o.pt.d);
+        if (hs.length) tx.createDiv({ cls: 'ls-muted', text: hs.map((h) => h.name).join(', ') });
+        r.addEventListener('click', () => { this.calSel = { y: o.pt.y, d: o.pt.d }; this.calAnchor = p.gOf(pt); this.calSetCal('cal', o.cal); });
+      }
+    }
+
+    const hols = (ctx.hol.get(pt.d) || []).filter((h) => this.holidayShown(h, V));
     if (hols.length) {
       const box = side.createDiv('ls-cal-detail-holidays');
       for (const h of hols) {
-        const r = box.createDiv('ls-cal-detail-holiday');
+        const r = box.createDiv('ls-cal-detail-holiday' + (h.cal !== V ? ` is-foreign ls-c-${h.cal.color}` : ''));
         setIcon(r.createSpan('ls-cal-detail-holiday-icon'), 'party-popper');
         r.createSpan({ cls: 'ls-cal-holiday', text: h.name });
-        const extra = [h.note, h.from === pt.y ? 'first held this year' : '', h.to != null && h.to === pt.y + 1 ? 'last held this year' : '', h.of > 1 && h.part === 1 ? `${h.of} days` : ''].filter(Boolean).join(' · ');
+        const extra = [h.cal !== V && h.cal.name, h.note, h.from === h.y ? 'first held this year' : '', h.to != null && h.cal.next(h.y) === h.to ? 'last held this year' : '', h.of > 1 && h.part === 1 ? `${h.of} days` : ''].filter(Boolean).join(' · ');
         if (extra) r.createSpan({ cls: 'ls-muted', text: extra });
-        r.addEventListener('click', () => (h.file ? p.openEntity(h.file) : p.openCalendarNote()));
+        r.addEventListener('click', () => (h.file ? p.openEntity(h.file) : p.editCalendar(h.cal)));
       }
     }
 
@@ -6419,7 +7958,7 @@ class OverviewView extends ItemView {
       }
     }
 
-    const items = (byDay.get(pt.d) || []).filter((it) => this.calShown(it.key));
+    const items = (ctx.byDay.get(pt.d) || []).filter((it) => this.calShown(it.key));
     const list = side.createDiv('ls-cal-detail-list');
     if (!items.length) list.createDiv({ cls: 'ls-muted', text: 'Nothing on this day yet.' });
     for (const it of items) {
@@ -6428,6 +7967,7 @@ class OverviewView extends ItemView {
       const line = row.createDiv('ls-cal-detail-line');
       line.createSpan({ cls: 'ls-cal-detail-name', text: it.label });
       if (it.note) line.createSpan({ cls: 'ls-muted', text: it.note });
+      if (it.cal && it.cal !== V) line.createSpan({ cls: `ls-cal-tag ls-c-${it.cal.color}`, text: it.raw && !it.recurring ? `${it.raw}` : it.cal.label() });
       line.addEventListener('click', () => it.open());
       if (it.scenes && it.scenes.length && this.calShown('scene')) {
         const sl = row.createDiv('ls-cal-detail-scenes');
@@ -6439,51 +7979,55 @@ class OverviewView extends ItemView {
     }
 
     const act = side.createDiv('ls-cal-detail-actions');
-    textBtn(act, 'New holiday on this day', () => new NameModal(this.app, { title: 'New holiday', placeholder: 'Holiday name', cta: 'Create' }, async (name) => {
-      const m = cal.months[this.calMonthOf(cal, pt.d)];
+    textBtn(act, 'New holiday on this day', () => new NameModal(this.app, { title: `New holiday on ${V.the()}`, placeholder: 'Holiday name', cta: 'Create' }, async (name) => {
+      const m = V.monthAt(pt.y, pt.d);
       const f = await p.createEntity('holiday', { name }, false);
       if (!f) return;
-      await this.app.fileManager.processFrontMatter(f, (fm) => { fm.date = `${pt.d - m.start} ${m.name}`; });
+      await this.app.fileManager.processFrontMatter(f, (fm) => {
+        fm.date = `${p.calendars().length > 1 ? `${V.short || V.name}: ` : ''}${pt.d - m.start} ${m.name}`;
+      });
       await p.openEntity(f);
     }).open());
     textBtn(act, 'New event on this day', () => new NameModal(this.app, { title: `New event on ${dateText}`, placeholder: 'Event name', cta: 'Create' }, async (name) => {
       const f = await p.createEntity('event', { name }, false);
       if (!f) return;
-      await this.app.fileManager.processFrontMatter(f, (fm) => { fm.date = dateText; });
+      await this.app.fileManager.processFrontMatter(f, (fm) => { fm.date = label; });
       await p.openEntity(f);
     }).open());
   }
 
   /* With no day picked, the side panel lists the month's days that have something on them. */
-  renderCalAgenda(side, cal, m, byDay) {
+  renderCalAgenda(side, V, m, ctx) {
     const p = this.plugin;
     const head = side.createDiv('ls-cal-detail-head');
     const t = head.createDiv('ls-cal-detail-titles');
-    t.createDiv({ cls: 'ls-cal-detail-title', text: `${m.name}, ${p.fmtYear(this.calYear)}` });
+    t.createDiv({ cls: 'ls-cal-detail-title', text: `${m.name}, ${V.yearText(this.calYear, m.start + 1)}` });
     t.createDiv({ cls: 'ls-muted', text: 'Tap a day for details.' });
     const list = side.createDiv('ls-cal-agenda');
     let any = false;
     for (let day = 1; day <= m.days; day++) {
-      const pt = { y: this.calYear, d: m.start + day };
-      const items = (byDay.get(pt.d) || []).filter((it) => this.calShown(it.key));
-      const holidays = this.calShown('holiday') ? p.holidayInfoOf(pt) : [];
-      const moons = this.calShown('moon') ? p.moonsOf(pt).filter((mo) => mo.exact != null) : [];
+      const doy = m.start + day;
+      const g = ctx.g0 + doy - 1;
+      const items = (ctx.byDay.get(doy) || []).filter((it) => this.calShown(it.key));
+      const holidays = (ctx.hol.get(doy) || []).filter((h) => this.holidayShown(h, V));
+      const moons = this.calShown('moon') ? p.moonsOn(g).filter((mo) => mo.exact != null) : [];
       if (!items.length && !holidays.length && !moons.length) continue;
       any = true;
       const row = list.createDiv('ls-cal-agenda-day');
       const when = row.createDiv('ls-cal-agenda-when');
       when.createSpan({ cls: 'ls-cal-agenda-num', text: String(day) });
-      const wd = p.weekdayOf(pt);
+      const wd = V.weekday(this.calYear, doy);
       if (wd) when.createSpan({ cls: 'ls-muted', text: wd });
-      when.addEventListener('click', () => { this.calSel = pt; this.render(); });
+      if (ctx.C) { const r = ctx.C.fromDay(g - ctx.C.epoch); when.createSpan({ cls: `ls-cal-alt ls-c-${ctx.C.color}`, text: ctx.C.dayText(r.y, r.d) }); }
+      when.addEventListener('click', () => { this.calSel = { y: this.calYear, d: doy }; this.render(); });
       const what = row.createDiv('ls-cal-agenda-what');
-      for (const h of holidays) this.calHoliday(what, h);
+      for (const h of holidays) this.calHoliday(what, h, V);
       for (const mo of moons) {
         const r = what.createDiv('ls-cal-agenda-moon');
         moonSvg(r, mo.exact / 8, '', 'is-exact');
         r.createSpan({ text: `${mo.name} ${MOON_PHASES[mo.exact].toLowerCase()}` });
       }
-      for (const it of items) this.calChip(what, it);
+      for (const it of items) this.calChip(what, it, V);
     }
     if (!any) list.createDiv({ cls: 'ls-muted', text: 'Nothing dated this month.' });
   }
@@ -7278,6 +8822,7 @@ class EntityView extends ItemView {
     }
     if (type === 'culture') iconBtn(actions, 'dices', 'Name builder', () => new NameBuilderModal(this.app, p, { culture: this.file }).open());
     if (TAXA.includes(type)) iconBtn(actions, 'arrow-right-left', 'Move to Species, Bestiary or Flora', (e) => p.convertMenu(e, this.file, () => this.leaf.detach()));
+    if (PLACES.includes(type)) iconBtn(actions, 'arrow-right-left', 'Change to a nation, region, settlement or location', (e) => p.placeMenu(e, this.file, (f) => p.openEntity(f)));
     iconBtn(actions, 'file-text', 'Open as note', () => p.openNote(this.file));
     iconBtn(actions, 'trash-2', `Delete ${def.label.toLowerCase()}`, () => {
       p.confirmDelete(this.file, def.label.toLowerCase(), () => this.leaf.detach());
@@ -7505,7 +9050,7 @@ class EntityView extends ItemView {
     fact(cat === 'main' ? 'star' : cat === 'minor' ? 'circle' : 'circle-dot', `${cap(cat)} character`, `ls-fact-cat is-${cat}`);
     if (dead) fact('skull', fm.status && !/^alive$/i.test(String(fm.status)) ? String(fm.status) : 'Deceased', 'is-dead');
     else if (fm.status) fact('heart-pulse', String(fm.status), 'is-alive');
-    const age = p.ageText(fm, p.latestPresent());
+    const age = p.ageText(fm, p.latestPresent(), me);
     if (age) fact('cake', age);
     if (fm.pronouns) fact('user', String(fm.pronouns));
     for (const s of toArr(fm.species)) {
@@ -7663,7 +9208,7 @@ class EntityView extends ItemView {
 
     // Timeline: events this character is part of, plus their own birth and death
     const evBody = this.block(main, 'Timeline', '__events');
-    const evs = p.timeline(idx, { births: true }).filter((e) => p.involves(e, me));
+    const evs = p.timeline(idx, { births: true, cal: p.calFor(me).id }).filter((e) => p.involves(e, me));
     if (!evs.length) {
       evBody.createDiv({ cls: 'ls-muted', text: 'Give them a birth year, or add them to an event, and their history lines up here.' });
     } else {
@@ -7691,7 +9236,7 @@ class EntityView extends ItemView {
       row.createSpan({ cls: 'ls-row-name', text: h.scene.basename });
       if (first) row.createSpan({ cls: 'ls-pill', text: 'First' });
       if (!h.explicit) row.createSpan({ cls: 'ls-pill is-faint', text: 'Mentioned' });
-      const age = p.ageShort(fm, p.presentOf(h.scene));
+      const age = p.ageShort(fm, p.presentOf(h.scene), me);
       if (age) row.createSpan({ cls: 'ls-pill ls-age-pill' + (age.warn ? ' is-warn' : ''), text: age.text });
       const scene = h.scene;
       row.addEventListener('click', () => p.openNote(scene));
@@ -7896,8 +9441,9 @@ class EntityView extends ItemView {
       if (r) t.createDiv({ cls: 'ls-fnode-rel', text: r.label });
       const nee = p.birthNameText(f);
       if (nee) t.createDiv({ cls: 'ls-fnode-nee', text: nee });
-      const born = p.toPt(p.fm(f).born);
-      if (born) t.createDiv({ cls: 'ls-fnode-dates', text: [p.fmtYear(born.y), p.toPt(p.fm(f).died) ? p.fmtYear(p.toPt(p.fm(f).died).y) : ''].filter(Boolean).join('–') });
+      const born = p.toPt(p.fm(f).born, f);
+      const died = born && p.toPt(p.fm(f).died, f);
+      if (born) t.createDiv({ cls: 'ls-fnode-dates', text: [born.cal.yearText(born.y, born.d), died ? (() => { const q = p.inCal(died, born.cal); return born.cal.yearText(q.y, q.d); })() : ''].filter(Boolean).join('–') });
       if (r) {
         n.setAttr('tabindex', '0');
         n.addEventListener('click', () => p.openEntity(f, 'character'));
@@ -8260,11 +9806,12 @@ class EntityView extends ItemView {
     const list = parent.createDiv('ls-list');
     for (const e of evs) {
       const row = list.createDiv(`ls-row ls-tl-${e.kind}`);
-      row.createSpan({ cls: 'ls-row-meta ls-app-chapter', text: e.year == null ? '?' : p.fmtYear(e.year) });
+      row.createSpan({ cls: 'ls-row-meta ls-app-chapter', text: e.year == null ? '?' : e.cal.yearText(e.year, e.d) });
       row.createSpan({ cls: 'ls-row-name', text: e.title });
       if (e.sub) row.createSpan({ cls: 'ls-pill', text: e.sub });
-      if (e.year != null && now) row.createSpan({ cls: 'ls-row-meta ls-ago', text: p.agoText({ y: e.year, d: e.d }, now) });
-      if (e.file !== this.file) row.addEventListener('click', () => p.openEntity(e.file));
+      if (e.pt && e.pt.cal !== e.cal && p.calendars().length > 1) row.createSpan({ cls: `ls-cal-tag ls-c-${e.pt.cal.color}`, text: e.pt.cal.label(), attr: { 'aria-label': `Written as ${e.when}` } });
+      if (e.year != null && now) row.createSpan({ cls: 'ls-row-meta ls-ago', text: p.agoText({ y: e.year, d: e.d, cal: e.cal }, now) });
+      if (e.file && e.file !== this.file) row.addEventListener('click', () => p.openEntity(e.file));
       else row.addClass('is-self');
     }
   }
@@ -8296,7 +9843,7 @@ class EntityView extends ItemView {
     }
 
     const evBody = this.block(main, 'Events', '__arcevents');
-    const evs = p.timeline(p.index()).filter((e) => p.involves(e, me));
+    const evs = p.timeline(p.index(), { cal: p.calFor(me).id }).filter((e) => p.involves(e, me));
     if (!evs.length) evBody.createDiv({ cls: 'ls-muted', text: 'Events that list this arc show up here, in historical order.' });
     else this.timelineList(evBody, evs);
   }
@@ -8372,7 +9919,7 @@ class EntityView extends ItemView {
 
     this.nameInputs = {};
     const yearInputs = {};
-    const hintAfter = { character: 'died', organization: 'founded', event: 'end_year', holiday: 'last_held' }[type];
+    const hintAfter = { character: 'died', organization: 'founded', nation: 'dissolved', settlement: 'founded', event: 'end', holiday: 'last_held' }[type];
     const closed = new Set(toArr(p.settings.sheetGroups[type]));
     let group = null;
     let box = props;
@@ -8403,7 +9950,7 @@ class EntityView extends ItemView {
       }
       box.createDiv({ cls: 'ls-prop-label', text: field.label });
       this.fieldControl(box, field, fm);
-      if (['born', 'died', 'founded', 'date', 'year', 'days', 'first_held', 'last_held'].includes(field.key) && box.lastElementChild instanceof HTMLInputElement) {
+      if (['born', 'died', 'founded', 'dissolved', 'date', 'end', 'year', 'days', 'first_held', 'last_held'].includes(field.key) && box.lastElementChild instanceof HTMLInputElement) {
         yearInputs[field.key] = box.lastElementChild;
       }
       if (field.key === hintAfter) this.yearHint(box, type, fm, yearInputs);
@@ -8529,30 +10076,107 @@ class EntityView extends ItemView {
       const lines = [];
       if (type === 'character') {
         const life = { born: val('born'), died: val('died') };
-        const main = p.ageText(life, now);
+        const main = p.ageText(life, now, this.file);
         if (main) lines.push(main);
-        else if (p.toPt(life.born)) lines.push('Set a present date on a story, chapter or scene, or in the calendar note, to see their age.');
+        else if (p.toPt(life.born, this.file)) lines.push('Set a present date on a story, chapter or scene, or in the calendar note, to see their age.');
         for (const s of stories) {
           const y = p.storyPresent(s);
           if (now && p.cmpPt(y, now) === 0 && y.y === now.y) continue;
-          const a = p.ageShort(life, y);
+          const a = p.ageShort(life, y, this.file);
           if (a) lines.push(`${s.basename} (${y.raw}): ${a.text}`);
         }
-      } else if (type === 'organization') {
-        const y = p.toPt(val('founded'));
-        if (y && now) lines.push(`Founded ${p.agoText(y, now)}, as of ${now.raw}`);
+        for (const k of ['born', 'died']) lines.push(...this.otherCalLines(val(k), k === 'born' ? 'Born' : 'Died'));
+      } else if (type === 'organization' || type === 'nation' || type === 'settlement') {
+        const y = p.toPt(val('founded'), this.file);
+        const end = type === 'nation' ? p.toPt(val('dissolved'), this.file) : null;
+        if (y && end) lines.push(`Stood for ${fmtNum(p.spanYears(y, end))} years`);
+        if (end && now) lines.push(`Fell ${p.agoText(end, now)}, as of ${now.raw}`);
+        else if (y && now) lines.push(`Founded ${p.agoText(y, now)}, as of ${now.raw}`);
+        lines.push(...this.otherCalLines(val('founded'), 'Founded'));
+        if (type === 'nation') lines.push(...this.otherCalLines(val('dissolved'), 'Fell'));
       } else if (type === 'event') {
-        const sort = numOrNull(val('year'));
-        const y = sort != null ? { y: sort, d: null } : p.toPt(val('date'));
-        if (y && now) lines.push(`${cap(p.agoText(y, now))}, as of ${now.raw}`);
+        const { start, end } = p.eventSpan(this.file, Object.assign({}, p.fm(this.file), { date: val('date'), end: val('end') }));
+        const et = String(val('end') || '').trim();
+        if (val('date') && !start) lines.push(`Can't read "${val('date')}" as a date.`);
+        if (et && start && !end) lines.push(`Can't read "${et}" as a date after the start.`);
+        if (start && end) lines.push(`Lasted ${p.durationText(start, end)}: ${start.cal.dateText(start)} to ${end.cal.dateText(end)}`);
+        if (start && now) lines.push(`${cap(p.agoText(start, now))}, as of ${now.raw}`);
+        if (start && start.d != null) lines.push(...this.otherCalLines(start, end ? 'Starts' : 'That is'));
+        if (end && end.d != null) lines.push(...this.otherCalLines(end, 'Ends'));
       } else if (type === 'holiday') {
-        lines.push(...p.holidaySummary({ date: val('date'), days: val('days'), first_held: val('first_held'), last_held: val('last_held') }, this.file));
+        lines.push(...p.holidaySummary(Object.assign({}, p.fm(this.file), { days: val('days'), first_held: val('first_held'), last_held: val('last_held') }), this.file));
       }
       for (const l of lines) hint.createDiv({ text: l });
       hint.style.display = lines.length ? '' : 'none';
     };
     for (const inp of Object.values(inputs)) inp.addEventListener('input', update);
     update();
+  }
+
+  /* "Born 3 Ember, 400 EK: 12 Betula, 1003 AD on the Common calendar" when the project has more than one calendar. */
+  otherCalLines(v, lead) {
+    const p = this.plugin;
+    if (p.calendars().length < 2) return [];
+    const pt = p.toPt(v, this.file);
+    if (!pt || pt.d == null) return [];
+    const others = p.otherDates(pt);
+    if (!others.length) return [];
+    return [`${lead} ${pt.cal.dateText(pt)} (${pt.cal.name}): ${others.map((o) => `${o.text} (${o.cal.name})`).join('; ')}`];
+  }
+
+  /* A holiday's dates: one row per calendar it's kept on, each with its own day and, optionally, the years it was kept
+     on that calendar. Saved as `date:` (one line) or a list. */
+  holidayDatesControl(parent, field, fm) {
+    const p = this.plugin;
+    const cals = p.calendars();
+    const many = cals.length > 1;
+    const w = p.world();
+    const rows = p.holidayDateLines(fm).map((line) => {
+      let t = line, years = '';
+      const pm = t.match(/\s*\(([^()]*\d[^()]*)\)/);
+      if (pm) { years = pm[1].trim(); t = (t.slice(0, pm.index) + t.slice(pm.index + pm[0].length)).trim(); }
+      const det = detectCal(w, t, null);
+      return { cal: det.marked ? det.cal.id : '', text: det.marked ? det.text : t, years };
+    });
+    if (!rows.length) rows.push({ cal: '', text: '', years: '' });
+    const box = parent.createDiv('ls-hol-dates');
+    box.setAttr('data-ls-key', field.key);
+    const label = (id) => { const c = p.calById(id); return c.short || c.name; };
+    const save = async () => {
+      const lines = rows.filter((r) => r.text.trim()).map((r) => {
+        const [rule, ...rest] = r.text.trim().split(/\s*,\s*/);
+        return `${r.cal ? `${label(r.cal)}: ` : ''}${rule}${r.years.trim() ? ` (${r.years.trim()})` : ''}${rest.length ? `, ${rest.join(', ')}` : ''}`;
+      });
+      await this.setFm((f) => { if (!lines.length) delete f.date; else f.date = lines.length === 1 ? lines[0] : lines; }, true);
+    };
+    const draw = (focusLast) => {
+      box.empty();
+      rows.forEach((r, i) => {
+        const row = box.createDiv('ls-hol-date');
+        if (many) {
+          const sel = row.createEl('select', { cls: 'dropdown', attr: { 'aria-label': 'Calendar' } });
+          sel.createEl('option', { text: 'Calendar: work it out', value: '' });
+          for (const c of cals) sel.createEl('option', { text: c.name, value: c.id });
+          sel.value = r.cal;
+          sel.addEventListener('change', () => { r.cal = sel.value; if (r.text.trim()) save(); });
+        }
+        const inp = row.createEl('input', { type: 'text', cls: 'ls-input', attr: { placeholder: i === 0 ? field.placeholder : 'Its day on this calendar', 'aria-label': 'Day' } });
+        inp.value = r.text;
+        inp.addEventListener('change', () => { r.text = inp.value; save(); });
+        const yrs = row.createEl('input', { type: 'text', cls: 'ls-input ls-hol-years', attr: { placeholder: 'Years (optional)', 'aria-label': 'Years kept on this calendar, like "from 1012" or "1012–1050"' } });
+        yrs.value = r.years;
+        yrs.addEventListener('change', () => { r.years = yrs.value; if (r.text.trim()) save(); });
+        if (rows.length > 1 || r.text) iconBtn(row, 'x', 'Remove this date', () => { rows.splice(i, 1); if (!rows.length) rows.push({ cal: '', text: '', years: '' }); save(); });
+        if (focusLast && i === rows.length - 1) window.setTimeout(() => inp.focus(), 20);
+      });
+      textBtn(box, many ? 'Add a date on another calendar' : 'Add another date', () => {
+        const usedCals = new Set(rows.map((r) => r.cal));
+        const next = many ? cals.find((c) => !usedCals.has(c.id)) : null;
+        rows.push({ cal: next ? next.id : '', text: '', years: '' });
+        draw(true);
+      }, 'ls-chip-add');
+    };
+    draw(false);
   }
 
   fieldControl(parent, field, fm) {
@@ -8587,6 +10211,8 @@ class EntityView extends ItemView {
       });
       return;
     }
+
+    if (field.kind === 'holidayDates') { this.holidayDatesControl(parent, field, fm); return; }
 
     if (field.kind === 'date') {
       const inp = parent.createEl('input', { type: 'date', cls: 'ls-input' });
@@ -9882,7 +11508,7 @@ class PanelView extends ItemView {
         this.navRow(gb, { icon: 'calendar-days', color: 'yellow', label: 'Calendar', out: true, onClick: () => p.openOverview('calendar') });
       }
       for (const [k, d] of Object.entries(TYPES)) {
-        if (d.group !== grp) continue;
+        if (d.group !== grp || d.special) continue;
         this.navRow(gb, { icon: d.icon, color: d.color, label: d.plural, meta: idx[k].length, onClick: () => this.go({ page: 'category', type: k }) });
       }
     }
@@ -9970,7 +11596,7 @@ class PanelView extends ItemView {
 
     // Who is this scene for, at what age
     const ages = cast.map((s) => p.resolveLink(s, f)).filter(Boolean)
-      .map((c) => ({ c, a: p.ageShort(p.fm(c), when) })).filter((x) => x.a);
+      .map((c) => ({ c, a: p.ageShort(p.fm(c), when, c) })).filter((x) => x.a);
     if (ages.length) {
       card.createDiv({ cls: 'ls-pv-label', text: 'Ages here' });
       const ab = card.createDiv('ls-chips');
@@ -10149,6 +11775,7 @@ class PanelView extends ItemView {
           if (WEB_TYPES.includes(type)) addMenuItem(m, 'Show in relations web', 'network', () => p.openWeb(f));
           addMenuItem(m, 'Move to folder…', 'folder-input', () => p.promptMoveToFolder(f, type));
           if (TAXA.includes(type)) addMenuItem(m, 'Move to Species, Bestiary or Flora…', 'arrow-right-left', () => p.convertMenu(e, f));
+          if (PLACES.includes(type)) addMenuItem(m, 'Change kind of place…', 'arrow-right-left', () => p.placeMenu(e, f));
           m.addSeparator();
           addMenuItem(m, 'Delete', 'trash-2', () => p.confirmDelete(f, def.label.toLowerCase()), true);
           m.showAtMouseEvent(e);
@@ -10201,12 +11828,11 @@ class PanelView extends ItemView {
       const now = p.latestPresent();
       const neg = p.negEras();
       let extra = null;
-      if (type === 'character') extra = ['Age', p.ageText(fm, now)];
+      if (type === 'character') extra = ['Age', p.ageText(fm, now, f)];
       else if (type === 'organization' && now && p.toPt(fm.founded)) extra = ['Founded', cap(p.agoText(fm.founded, now))];
       else if (type === 'event' && now) {
-        const sort = numOrNull(fm.year);
-        const y = sort != null ? { y: sort, d: null } : p.toPt(fm.date);
-        if (y) extra = ['When', cap(p.agoText(y, now))];
+        const { start, end } = p.eventSpan(f, fm);
+        if (start) extra = ['When', cap(p.agoText(start, now)) + (end ? `, lasted ${p.durationText(start, end)}` : '')];
       } else if (type === 'holiday') extra = ['Calendar', p.holidaySummary(fm, f).join(' ')];
       if (extra && extra[1]) {
         const r = dl.createDiv('ls-pv-field');
@@ -10295,7 +11921,7 @@ class PanelView extends ItemView {
         row.createSpan({ cls: 'ls-row-meta', text: h.chapter });
         row.createSpan({ cls: 'ls-row-name', text: h.scene.basename });
         if (!h.explicit) row.createSpan({ cls: 'ls-pill is-faint', text: 'Mentioned' });
-        const age = p.ageShort(fm, p.presentOf(h.scene));
+        const age = p.ageShort(fm, p.presentOf(h.scene), f);
         if (age) row.createSpan({ cls: 'ls-pill ls-age-pill' + (age.warn ? ' is-warn' : ''), text: age.text });
         const scene = h.scene;
         row.addEventListener('click', () => p.openInMain(scene));
@@ -10323,7 +11949,7 @@ function svgEl(tag, attrs, parent) {
   if (parent) parent.appendChild(e);
   return e;
 }
-const WEB_TYPES = ['character', 'organization', 'culture', 'species', 'creature', 'location', 'item', 'discovery', 'event'];
+const WEB_TYPES = ['character', 'organization', 'culture', 'species', 'creature', 'nation', 'region', 'settlement', 'location', 'item', 'discovery', 'event'];
 
 class WebView extends ItemView {
   constructor(leaf, plugin) {
@@ -11359,6 +12985,55 @@ class NameModal extends Modal {
   onClose() { this.contentEl.empty(); }
 }
 
+/* "Sort locations": every location with a guess at whether it's really a nation, region or settlement. */
+class PlaceSorterModal extends Modal {
+  constructor(app, plugin) { super(app); this.plugin = plugin; }
+  onOpen() {
+    const p = this.plugin;
+    this.titleEl.setText('Sort locations');
+    this.modalEl.addClass('ls-sorter-modal');
+    const el = this.contentEl;
+    const files = p.index().location;
+    if (!files.length) { el.createDiv({ cls: 'ls-muted', text: 'There are no locations to sort.' }); return; }
+    el.createDiv({ cls: 'ls-hint', text: 'Kingdoms and empires can become Nations, continents and provinces Regions, and cities and towns Settlements. The guesses come from each place\'s Type and name; change any you disagree with. Links keep working, and subfolders are kept under the new category\'s folder.' });
+    const picks = new Map(files.map((f) => [f, p.guessPlace(f)]));
+    const list = el.createDiv('ls-sorter');
+    for (const f of files) {
+      const row = list.createDiv('ls-sorter-row');
+      const name = row.createDiv('ls-sorter-name');
+      name.createSpan({ text: f.basename });
+      const k = p.fm(f).kind;
+      if (k) name.createSpan({ cls: 'ls-muted', text: String(k) });
+      const sel = row.createEl('select', { cls: 'dropdown' });
+      for (const t of PLACES) sel.createEl('option', { text: t === 'location' ? 'Keep as a location' : TYPES[t].label, value: t });
+      sel.value = picks.get(f);
+      sel.addEventListener('change', () => { picks.set(f, sel.value); count(); });
+    }
+    const counts = el.createDiv('ls-muted');
+    const act = el.createDiv('ls-modal-actions');
+    textBtn(act, 'Cancel', () => this.close());
+    const btn = textBtn(act, 'Move', async () => {
+      btn.disabled = true;
+      let n = 0;
+      /* Nations first, so settlements that are part of them can tell they belong to a nation. */
+      for (const kind of ['nation', 'region', 'settlement']) {
+        for (const [f, to] of picks) if (to === kind) { await p.convertPlace(f, to, true); n++; }
+      }
+      p.refreshOverviews();
+      new Notice(`Sorted ${n} place${n === 1 ? '' : 's'}.`);
+      this.close();
+    }, 'mod-cta');
+    const count = () => {
+      const n = [...picks.values()].filter((v) => v !== 'location').length;
+      counts.setText(n ? `${n} of ${files.length} will move.` : 'Nothing will move.');
+      btn.disabled = !n;
+      btn.setText(n ? `Move ${n}` : 'Move');
+    };
+    count();
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
 class ConfirmModal extends Modal {
   constructor(app, opts, onConfirm) { super(app); this.opts = opts; this.onConfirm = onConfirm; }
   onOpen() {
@@ -11471,6 +13146,619 @@ class ProjectSuggest extends FuzzySuggestModal {
 /* Settings                                                            */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Calendar editor                                                     */
+/* ------------------------------------------------------------------ */
+
+/* Everything about one calendar on one page: its months (with leap rules), week, moons, eras, where it lines up
+   against the other calendars, and who keeps it. Writes the calendar note's properties and its base Months,
+   Weekdays and Moons sections; dated sections and History are left as they are in the note. */
+class CalendarEditorModal extends Modal {
+  constructor(app, plugin, file) {
+    super(app);
+    this.plugin = plugin;
+    this.file = file;
+  }
+  async onOpen() {
+    const p = this.plugin;
+    this.modalEl.addClass('ls-cal-editor-modal');
+    this.titleEl.setText(`Edit calendar: ${this.file.basename}`);
+    const text = await this.app.vault.read(this.file);
+    const fm = readFm(text);
+    const parsed = parseSections(splitFm(text).body);
+    const sec = (n) => { const s = parsed.sections.find((x) => x.name.trim().toLowerCase() === n); return s ? s.lines.join('\n') : ''; };
+    const model = buildCalModel(fm, splitFm(text).body, this.file.path);
+    const cal = p.world().byFile.get(this.file.path);
+    const [al, ar] = String(toArr(fm.align)[0] || '').split(/\s*=\s*/);
+    this.cal = cal;
+    this.st = {
+      name: this.file.basename,
+      short: String(fm.short || ''),
+      color: model.color || '',
+      custom: model.custom,
+      eras: model.eras.list.map((e) => ({ name: e.name, short: e.short, len: e.len ? String(e.len) : '', mode: e.mode, num: String(e.num), fmt: e.fmt })),
+      eraRepeat: model.eras.repeat ? String(model.eras.repeat) : '',
+      eraFmt: model.eras.fmt || '',
+      eraWord: model.eras.word && model.eras.word !== 'Age' ? model.eras.word : '',
+      noZero: !model.eras.zero,
+      newYear: fm.new_year == null ? '' : String(fm.new_year),
+      newYearByEnd: /^end/i.test(String(fm.new_year_numbering || '')),
+      weekLike: linkText(String(fm.week_like || '')).trim(),
+      useFrom: fm.in_use_from == null ? '' : String(fm.in_use_from),
+      useUntil: fm.in_use_until == null ? '' : String(fm.in_use_until),
+      months: parseMonthLines(sec('months')).map((m) => ({ name: [m.name, ...m.aliases].join('/'), days: String(m.days), leap: leapText(m.leap) })),
+      weekdays: parseWeekdayLines(sec('weekdays')).join('\n'),
+      moons: calLines(sec('moons')).map((l) => { const [name, c, o] = l.split(',').map((x) => x.trim()); return { name: name || '', cycle: c || '', offset: o || '0' }; }),
+      alignLeft: al || '', alignRight: ar || '',
+      keptBy: toArr(fm.kept_by),
+      present: fm.present == null ? '' : String(fm.present),
+      makePrimary: false,
+    };
+    if (!this.st.months.length) this.st.months.push({ name: '', days: '', leap: '' });
+    this.isPrimary = cal ? cal === p.primaryCal() : !!fm.primary;
+    this.dated = parsed.sections.filter((s) => /^(months|weekdays)\s*\(/i.test(s.name)).map((s) => s.name);
+    this.draw();
+  }
+
+  /* The eras on the form, cleaned up: [{ name, short, len, mode, num, fmt }]. */
+  eraList() {
+    return this.st.eras.map((e) => ({
+      name: e.name.trim(), short: e.short.trim(), len: numOrNull(e.len) > 0 ? Math.round(Number(e.len)) : null,
+      mode: e.mode, num: Number.isFinite(Number(e.num)) && String(e.num).trim() !== '' ? Math.round(Number(e.num)) : (e.mode === 'upTo' ? -1 : e.mode === 'up' ? 1 : 1), fmt: e.fmt.trim(),
+    }));
+  }
+  eraOpts() {
+    const s = this.st;
+    return { repeat: numOrNull(s.eraRepeat), fmt: s.eraFmt.trim(), word: s.eraWord.trim() || 'Age', zero: !s.noZero };
+  }
+
+  /* A calendar built from what's on the form right now, lined up as the form says. */
+  preview() {
+    const p = this.plugin;
+    const s = this.st;
+    const o = this.eraOpts();
+    const fm = { custom_calendar: s.custom, era_repeat: o.repeat, era_format: o.fmt, era_word: o.word, no_year_zero: !o.zero, new_year: s.newYear, new_year_numbering: s.newYearByEnd ? 'end' : '' };
+    const body = `## Months\n${s.months.filter((m) => m.name.trim()).map((m) => `- ${m.name}, ${m.days || 0}${m.leap ? ', ' + m.leap : ''}`).join('\n')}\n\n## Weekdays\n${s.weekdays}\n\n## Eras\n${this.eraList().map((e) => `- ${eraLine(e)}`).join('\n')}\n`;
+    const c = new Cal(buildCalModel(fm, body, this.file.path), { id: 'preview', name: s.name || this.file.basename });
+    if (c.broken) return { cal: c };
+    const w = p.world();
+    const prim = w.primary === this.cal ? null : w.primary;
+    let epoch = 0, other = prim, err = '';
+    if (!this.isPrimary && prim && (s.alignLeft.trim() || s.alignRight.trim())) {
+      const lp = c.parse(s.alignLeft);
+      const det = detectCal(w, s.alignRight, prim);
+      other = det.cal === this.cal ? prim : det.cal;
+      const rp = other.parse(det.text);
+      if (lp && rp && lp.d != null && rp.d != null) epoch = other.epoch + other.toDay(rp.y, rp.d) - c.toDay(lp.y, lp.d);
+      else if (lp && rp) epoch = other.epoch + other.daysBefore(rp.y) - c.daysBefore(lp.y);
+      else err = !lp ? `Can't read "${s.alignLeft}" as a date in this calendar.` : `Can't read "${s.alignRight}" as a date.`;
+    } else if (!this.isPrimary && this.cal) epoch = this.cal.epoch;
+    c.epoch = epoch;
+    return { cal: c, other, err };
+  }
+
+  draw() {
+    const p = this.plugin;
+    const s = this.st;
+    const el = this.contentEl;
+    const keep = el.scrollTop;
+    el.empty();
+    el.addClass('ls-cal-editor');
+    const section = (title, hint) => {
+      const box = el.createDiv('ls-ce-sec');
+      box.createEl('h3', { text: title });
+      if (hint) box.createDiv({ cls: 'ls-hint', text: hint });
+      return box;
+    };
+    const field = (parent, label, value, onInput, attrs = {}) => {
+      const row = parent.createEl('label', { cls: 'ls-ce-field' });
+      row.createSpan({ cls: 'ls-ce-label', text: label });
+      const inp = row.createEl('input', { type: attrs.type || 'text', cls: 'ls-input', attr: attrs });
+      inp.value = value;
+      inp.addEventListener('input', () => { onInput(inp.value); this.refreshSummary(); });
+      return inp;
+    };
+    const check = (parent, label, value, onChange) => {
+      const row = parent.createEl('label', { cls: 'ls-ce-check' });
+      const cb = row.createEl('input', { type: 'checkbox' });
+      cb.checked = !!value;
+      row.createSpan({ text: label });
+      cb.addEventListener('change', () => { onChange(cb.checked); this.draw(); });
+      return cb;
+    };
+
+    /* Name */
+    const id = section('Name');
+    const nr = id.createDiv('ls-ce-row');
+    field(nr, 'Name', s.name, (v) => { s.name = v; });
+    field(nr, 'Short name', s.short, (v) => { s.short = v; }, { placeholder: 'Elven' });
+    const cr = nr.createEl('label', { cls: 'ls-ce-field' });
+    cr.createSpan({ cls: 'ls-ce-label', text: 'Color' });
+    const csel = cr.createEl('select', { cls: 'dropdown' });
+    csel.createEl('option', { text: 'Automatic', value: '' });
+    for (const c of COLORS) csel.createEl('option', { text: cap(c), value: c });
+    csel.value = s.color;
+    csel.addEventListener('change', () => { s.color = csel.value; });
+    id.createDiv({ cls: 'ls-hint', text: 'The short name marks dates written in this calendar when its month names alone don\'t give it away: "Elven: 3 Ember 400" or "3 Ember 400 (Elven)".' });
+    if (this.isPrimary) id.createDiv({ cls: 'ls-ce-note', text: 'This is the primary calendar. Dates that don\'t say otherwise are read in it, and its years are the ones shown on ages, roles and the rest of Loresmith.' });
+    else if (this.cal && this.cal.file) {
+      check(id, 'Make this the primary calendar when I save', s.makePrimary, (v) => { s.makePrimary = v; });
+    }
+
+    /* Kind */
+    const kind = section('Kind of calendar');
+    const radio = kind.createDiv('ls-radio ls-ce-radio');
+    for (const [v, l] of [[false, 'Modern (January to December)'], [true, 'Custom']]) {
+      const b = radio.createEl('button', { text: l, cls: s.custom === v ? 'is-active' : '' });
+      b.addEventListener('click', () => { s.custom = v; this.draw(); });
+    }
+
+    if (s.custom) {
+      /* Months */
+      const ms = section('Months', 'In order. A leap rule adds days in some years: "+1 every 4", or "+1 every 4, except every 100, but every 400". A month of 0 days with a rule is a leap month ("+30 every 3"). Write "Frostmoon/Frost" to accept a short form too.');
+      const table = ms.createDiv('ls-ce-table ls-ce-months');
+      const head = table.createDiv('ls-ce-tr is-head');
+      for (const h of ['Month', 'Days', 'Leap rule', '']) head.createSpan({ text: h });
+      s.months.forEach((m, i) => {
+        const tr = table.createDiv('ls-ce-tr');
+        const name = tr.createEl('input', { type: 'text', cls: 'ls-input', attr: { placeholder: 'Frostmoon', 'aria-label': 'Month name' } });
+        name.value = m.name;
+        name.addEventListener('input', () => { m.name = name.value; this.refreshSummary(); });
+        const days = tr.createEl('input', { type: 'number', cls: 'ls-input', attr: { min: '0', placeholder: '30', 'aria-label': 'Days' } });
+        days.value = m.days;
+        days.addEventListener('input', () => { m.days = days.value; this.refreshSummary(); });
+        const leap = tr.createEl('input', { type: 'text', cls: 'ls-input', attr: { placeholder: 'None', 'aria-label': 'Leap rule' } });
+        leap.value = m.leap;
+        leap.addEventListener('input', () => { m.leap = leap.value; this.refreshSummary(); });
+        const tools = tr.createDiv('ls-ce-tools');
+        if (i > 0) iconBtn(tools, 'arrow-up', 'Move up', () => { [s.months[i - 1], s.months[i]] = [s.months[i], s.months[i - 1]]; this.draw(); });
+        if (i < s.months.length - 1) iconBtn(tools, 'arrow-down', 'Move down', () => { [s.months[i + 1], s.months[i]] = [s.months[i], s.months[i + 1]]; this.draw(); });
+        iconBtn(tools, 'x', 'Remove month', () => { s.months.splice(i, 1); if (!s.months.length) s.months.push({ name: '', days: '', leap: '' }); this.draw(); });
+      });
+      const add = textBtn(ms, 'Add month', () => { s.months.push({ name: '', days: s.months[s.months.length - 1].days || '', leap: '' }); this.draw(); window.setTimeout(() => { const ins = this.contentEl.querySelectorAll('.ls-ce-months .ls-ce-tr:last-child input'); if (ins[0]) ins[0].focus(); }, 20); }, 'ls-chip-add');
+      add.setAttr('aria-label', 'Add month');
+      this.summaryEl = ms.createDiv('ls-ce-summary');
+      if (this.dated.length) ms.createDiv({ cls: 'ls-hint', text: `Changes later in history (${this.dated.join(', ')}) stay as written in the note.` });
+
+      /* Weekdays */
+      const wk = section('Week', 'One per line, starting with the weekday of the first day of year 1. Leave empty for no week.');
+      const ta = wk.createEl('textarea', { cls: 'ls-input ls-ce-week', attr: { rows: '4', placeholder: 'Moonday\nTowerday\nWindsday' } });
+      ta.value = s.weekdays;
+      ta.addEventListener('input', () => { s.weekdays = ta.value; this.refreshSummary(); });
+      const others = p.calendars().filter((c) => c.file && c.file !== this.file && c.weekSets.length);
+      if (others.length) {
+        const ww = wk.createEl('label', { cls: 'ls-ce-field' });
+        ww.createSpan({ cls: 'ls-ce-label', text: 'Weekdays' });
+        const wsel = ww.createEl('select', { cls: 'dropdown' });
+        wsel.createEl('option', { text: 'Count from year 1 of this calendar', value: '' });
+        for (const c of others) wsel.createEl('option', { text: `Keep step with ${c.the()} (the first weekday here falls on its first)`, value: c.name });
+        wsel.value = others.some((c) => c.name === s.weekLike) ? s.weekLike : '';
+        wsel.addEventListener('change', () => { s.weekLike = wsel.value; this.refreshSummary(); });
+        this.weekEl = wk.createDiv('ls-ce-summary');
+      } else this.weekEl = null;
+    } else this.summaryEl = kind.createDiv('ls-ce-summary');
+
+    /* New Year */
+    const nyb = section('New Year', 'The day the year number changes, if it isn\'t the first day of the first month: a year that runs from 1 June to 31 May, or one that begins on 25 March. Months, leap days and weekdays stay as they are.');
+    const nr2 = nyb.createDiv('ls-ce-row');
+    const firstM = (s.custom ? (s.months.find((m) => m.name.trim()) || {}).name || '' : 'January').split('/')[0];
+    field(nr2, 'The year begins on', s.newYear, (v) => { s.newYear = v; }, { placeholder: firstM ? `1 ${firstM}` : '1 June' });
+    const nw = nr2.createEl('label', { cls: 'ls-ce-field' });
+    nw.createSpan({ cls: 'ls-ce-label', text: 'A year is numbered by' });
+    const nsel = nw.createEl('select', { cls: 'dropdown' });
+    nsel.createEl('option', { text: 'The year it begins in', value: 'start' });
+    nsel.createEl('option', { text: 'The year it ends in', value: 'end' });
+    nsel.value = s.newYearByEnd ? 'end' : 'start';
+    nsel.addEventListener('change', () => { s.newYearByEnd = nsel.value === 'end'; this.refreshSummary(); });
+    this.nyEl = nyb.createDiv('ls-ce-summary');
+
+    /* Moons */
+    const mo = section('Moons', 'Moons belong to the world, so every calendar shows them: list each moon in one calendar only. Cycle is days from new moon to new moon; "new on day" is how many days after this calendar\'s year 1 began it was new.' + (!s.custom ? ' Leave empty for Earth\'s moon.' : ''));
+    const mt = mo.createDiv('ls-ce-table ls-ce-moons');
+    if (s.moons.length) { const h = mt.createDiv('ls-ce-tr is-head'); for (const t of ['Moon', 'Cycle (days)', 'New on day', '']) h.createSpan({ text: t }); }
+    s.moons.forEach((m, i) => {
+      const tr = mt.createDiv('ls-ce-tr');
+      for (const [k, ph] of [['name', 'Selune'], ['cycle', '29.5'], ['offset', '0']]) {
+        const inp = tr.createEl('input', { type: k === 'name' ? 'text' : 'number', cls: 'ls-input', attr: { placeholder: ph, step: 'any', 'aria-label': ph } });
+        inp.value = m[k];
+        inp.addEventListener('input', () => { m[k] = inp.value; });
+      }
+      iconBtn(tr.createDiv('ls-ce-tools'), 'x', 'Remove moon', () => { s.moons.splice(i, 1); this.draw(); });
+    });
+    textBtn(mo, 'Add moon', () => { s.moons.push({ name: '', cycle: '', offset: '0' }); this.draw(); }, 'ls-chip-add');
+
+    /* Eras */
+    const er = section('Years and eras', 'How this calendar numbers its years, as a list of eras from oldest to newest. Each era counts its own years: up from a number (1 AD, 2 AD…), up to one (-1195 Ancient … -1 Ancient), or down to one (395 BC … 1 BC). The first era that counts up is where the count starts; the ones before and after it follow on.');
+    const pre = er.createDiv('ls-ce-presets');
+    pre.createSpan({ cls: 'ls-ce-label', text: 'Start from' });
+    for (const [k, pr] of Object.entries(ERA_PRESETS)) {
+      const b = textBtn(pre, pr.label, () => {
+        s.eras = pr.eras.map((e) => ({ name: e.name, short: e.short, len: e.len ? String(e.len) : '', mode: e.mode, num: String(e.num), fmt: e.fmt || '' }));
+        s.eraRepeat = pr.repeat ? String(pr.repeat) : '';
+        s.eraFmt = pr.fmt || '';
+        s.eraWord = pr.word && pr.word !== 'Age' ? pr.word : '';
+        s.noZero = pr.zero === false;
+        this.draw();
+      }, 'ls-chip-add');
+      b.setAttr('aria-label', pr.desc);
+    }
+    const et = er.createDiv('ls-ce-eras');
+    s.eras.forEach((e, i) => {
+      const card = et.createDiv('ls-ce-era');
+      const r1 = card.createDiv('ls-ce-row');
+      const inp = (parent, label, k, ph, type) => {
+        const w = parent.createEl('label', { cls: 'ls-ce-field' + (type === 'number' ? ' is-narrow' : '') });
+        w.createSpan({ cls: 'ls-ce-label', text: label });
+        const x = w.createEl('input', { type: type || 'text', cls: 'ls-input', attr: { placeholder: ph } });
+        x.value = e[k];
+        x.addEventListener('input', () => { e[k] = x.value; this.refreshSummary(); });
+        return x;
+      };
+      inp(r1, 'Name', 'name', i === 0 ? 'Ancient' : 'Divine Age');
+      inp(r1, 'Short form', 'short', i === 0 ? 'BC' : 'Divine');
+      inp(r1, 'Lasts (years)', 'len', 'Open', 'number');
+      const r2 = card.createDiv('ls-ce-row');
+      const mw = r2.createEl('label', { cls: 'ls-ce-field' });
+      mw.createSpan({ cls: 'ls-ce-label', text: 'Its years' });
+      const mrow = mw.createDiv('ls-ce-inline');
+      const ms = mrow.createEl('select', { cls: 'dropdown' });
+      for (const [v, t] of ERA_MODES) ms.createEl('option', { text: t, value: v });
+      ms.value = e.mode;
+      ms.addEventListener('change', () => { e.mode = ms.value; if (ms.value === 'upTo' && Number(e.num) > 0) e.num = '-1'; if (ms.value !== 'upTo' && Number(e.num) < 0) e.num = '1'; this.draw(); });
+      const num = mrow.createEl('input', { type: 'number', cls: 'ls-input', attr: { 'aria-label': 'Number', placeholder: '1' } });
+      num.value = e.num;
+      num.addEventListener('input', () => { e.num = num.value; this.refreshSummary(); });
+      const fw = r2.createEl('label', { cls: 'ls-ce-field' });
+      fw.createSpan({ cls: 'ls-ce-label', text: 'Written' });
+      const fs = fw.createEl('select', { cls: 'dropdown' });
+      fs.createEl('option', { text: 'Like the rest', value: '' });
+      for (const [f, ex] of ERA_FORMATS) fs.createEl('option', { text: `${f.replace(/[{}]/g, '')}  (${ex.split(' · ')[0]})`, value: f });
+      const own = e.fmt && !ERA_FORMATS.some(([f]) => f === e.fmt);
+      if (own) fs.createEl('option', { text: e.fmt, value: e.fmt });
+      fs.value = e.fmt;
+      fs.addEventListener('change', () => { e.fmt = fs.value; this.refreshSummary(); });
+      const tools = r2.createDiv('ls-ce-tools');
+      if (i > 0) iconBtn(tools, 'arrow-up', 'Move earlier', () => { [s.eras[i - 1], s.eras[i]] = [s.eras[i], s.eras[i - 1]]; this.draw(); });
+      if (i < s.eras.length - 1) iconBtn(tools, 'arrow-down', 'Move later', () => { [s.eras[i + 1], s.eras[i]] = [s.eras[i], s.eras[i + 1]]; this.draw(); });
+      if (s.eras.length > 1) iconBtn(tools, 'x', 'Remove era', () => { s.eras.splice(i, 1); this.draw(); });
+      card.createDiv({ cls: 'ls-ce-era-span', attr: { 'data-era': String(i) } });
+    });
+    const addRow = er.createDiv('ls-ce-row');
+    textBtn(addRow, 'Add an earlier era', () => { s.eras.unshift({ name: '', short: '', len: '', mode: 'down', num: '1', fmt: '' }); this.draw(); }, 'ls-chip-add');
+    textBtn(addRow, 'Add a later era', () => { const last = s.eras[s.eras.length - 1]; if (last && !last.len) last.len = s.eraRepeat || '100'; s.eras.push({ name: '', short: '', len: '', mode: 'up', num: '1', fmt: '' }); this.draw(); }, 'ls-chip-add');
+    const og = er.createDiv('ls-ce-row');
+    field(og, 'Then keep adding eras of (years)', s.eraRepeat, (v) => { s.eraRepeat = v; }, { placeholder: 'No', type: 'number' });
+    field(og, 'Eras are called', s.eraWord, (v) => { s.eraWord = v; }, { placeholder: 'Age' });
+    const dw = og.createEl('label', { cls: 'ls-ce-field' });
+    dw.createSpan({ cls: 'ls-ce-label', text: 'Years are written' });
+    const ds = dw.createEl('select', { cls: 'dropdown' });
+    ds.createEl('option', { text: 'Number then short form', value: '' });
+    for (const [f, ex] of ERA_FORMATS) ds.createEl('option', { text: ex, value: f });
+    if (s.eraFmt && !ERA_FORMATS.some(([f]) => f === s.eraFmt)) ds.createEl('option', { text: s.eraFmt, value: s.eraFmt });
+    ds.value = s.eraFmt;
+    ds.addEventListener('change', () => { s.eraFmt = ds.value; this.refreshSummary(); });
+    check(er, 'Skip year 0 when an era counts across it (… -2, -1, 1, 2 …)', s.noZero, (v) => { s.noZero = v; });
+    this.eraEl = er.createDiv('ls-ce-summary');
+    er.createDiv({ cls: 'ls-hint', text: 'Short forms can list spellings: "BC/BCE". Patterns: {y} the year, {short}, {name}, {n} the era\'s number (the first era counting up is 1), {ord} "9th", {roman} "IX", {word}. Write "?" as a name for an era you haven\'t named yet. Any spelling here is understood when you type a date, and a short form only this calendar uses tells Loresmith which calendar a date is in.' });
+
+    /* In use */
+    const iu = section('In use', 'When people used this calendar, for calendars that were adopted or abandoned during your history. Dates can be written in any calendar. Leave empty for always. Outside these years its holidays aren\'t kept, and "In use at the time" views skip it.');
+    const ir = iu.createDiv('ls-ce-row');
+    field(ir, 'From', s.useFrom, (v) => { s.useFrom = v; }, { placeholder: 'Always' });
+    field(ir, 'Until', s.useUntil, (v) => { s.useUntil = v; }, { placeholder: 'Still in use' });
+    this.useEl = iu.createDiv('ls-ce-summary');
+
+    /* Line-up */
+    if (!this.isPrimary) {
+      const prim = p.primaryCal();
+      const lu = section('How it lines up', `Pick any day you know in both calendars. Every other date converts from there, exactly, both ways.`);
+      const r = lu.createDiv('ls-ce-row ls-ce-align');
+      field(r, `A day on this calendar`, s.alignLeft, (v) => { s.alignLeft = v; }, { placeholder: s.months[0] && s.months[0].name ? `1 ${s.months[0].name.split('/')[0]} 1` : '1 January 1' });
+      r.createSpan({ cls: 'ls-ce-eq', text: '=' });
+      field(r, `The same day on another`, s.alignRight, (v) => { s.alignRight = v; }, { placeholder: prim.dateText({ y: 1000, d: 1 }) });
+      this.alignEl = lu.createDiv('ls-ce-summary');
+    } else this.alignEl = null;
+
+    /* Kept by */
+    const kb = section('Kept by', 'Cultures, groups, peoples or places that use this calendar. Characters, events and holidays tied to them read plain dates in it.');
+    const chips = kb.createDiv('ls-chips');
+    for (const l of s.keptBy) {
+      const d = p.resolveLink(l, this.file);
+      const chip = chips.createDiv('ls-chip' + (d ? '' : ' is-unresolved'));
+      chip.createSpan({ text: d ? d.basename : linkText(l) });
+      iconBtn(chip, 'x', 'Remove', () => { s.keptBy = s.keptBy.filter((x) => x !== l); this.draw(); });
+    }
+    textBtn(chips, 'Add', () => new EntitySuggest(this.app, p, ['culture', 'organization', 'species', 'nation', 'region', 'settlement', 'location'], (f) => {
+      const l = p.linkTo(f, this.file);
+      if (!s.keptBy.some((x) => linkText(x) === linkText(l))) s.keptBy.push(l);
+      this.draw();
+    }).open(), 'ls-chip-add');
+
+    if (this.isPrimary || s.makePrimary) {
+      const pr = section('Present day', 'The world\'s "now", used for ages and "years ago" when no story, chapter or scene sets its own. It can be written in any calendar.' + (!s.custom && !s.customEras ? ' Leave empty for today.' : ''));
+      field(pr, 'Present date', s.present, (v) => { s.present = v; }, { placeholder: s.custom ? '12 Frostmoon, 1023' : '6 October 2026' });
+    }
+
+    const act = el.createDiv('ls-modal-actions');
+    textBtn(act, 'Open as note', async () => { await this.save(); p.openNote(this.file); });
+    textBtn(act, 'Cancel', () => this.close());
+    textBtn(act, 'Save', () => this.save().then(() => this.close()), 'mod-cta');
+    this.refreshSummary();
+    el.scrollTop = keep;
+  }
+
+  /* "13 months, 365 days a year (366 in leap years)" and where year 1 lands, as you type. */
+  refreshSummary() {
+    const p = this.plugin;
+    if (!this.summaryEl) return;
+    let pv;
+    try { pv = this.preview(); } catch (e) { pv = null; }
+    this.summaryEl.empty();
+    if (!pv) return;
+    const c = pv.cal;
+    if (c.broken) { this.summaryEl.setText('Add at least one month with days.'); if (this.alignEl) this.alignEl.empty(); return; }
+    const seg = c.monthSets[0];
+    const leapy = !seg.modern && seg.months.some((m) => m.leap);
+    const wk = c.year(1).weekdays.length;
+    this.summaryEl.setText(seg.modern
+      ? 'Modern calendar: 365 days, 366 in leap years, a seven-day week.'
+      : `${seg.months.filter((m) => m.days > 0).length} months, ${fmtNum(seg.base)} days a year${leapy ? `, ${(seg.avg).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')} on average` : ''}${wk ? `, a ${wk}-day week` : ', no week'}.`);
+    if (this.eraEl) {
+      this.eraEl.empty();
+      const E = c.eras;
+      for (const msg of E.problems) this.eraEl.createDiv({ cls: 'ls-ce-error', text: msg });
+      const sample = [];
+      E.list.forEach((e, i) => {
+        const st = E.st[i], en = E.en[i];
+        const box = this.contentEl.querySelector ? this.contentEl.querySelector(`.ls-ce-era-span[data-era="${i}"]`) : null;
+        let text;
+        if (st == null) text = 'Never reached: an era before it has no length.';
+        else if (i === 0 && E.list.length === 1) text = `… ${c.fmtYear(-1)}, ${c.fmtYear(0)}, ${c.fmtYear(1)} …: one count, running both ways`;
+        else {
+          const a = Number.isFinite(st) ? c.fmtYear(st) : `… ${c.fmtYear(en - 2)}`;
+          const b = Number.isFinite(en) ? c.fmtYear(en) : `${c.fmtYear(st + 2)} …`;
+          text = Number.isFinite(st) && Number.isFinite(en) ? `${a} to ${b} (${fmtNum(en - st + 1)} years)` : !Number.isFinite(st) ? `${a}, ${c.fmtYear(en - 1)}, ${b}: runs back forever` : `${a}, ${c.fmtYear(st + 1)}, ${b}: runs on`;
+          if (Number.isFinite(st)) sample.push(st);
+          if (Number.isFinite(en)) sample.push(en);
+        }
+        if (box) box.setText(text);
+        else this.eraEl.createDiv({ text: `${E.label(i)}: ${text}` });
+      });
+      if (E.repeat) {
+        const last = E.en.filter((x) => Number.isFinite(x)).pop();
+        if (last != null) { this.eraEl.createDiv({ text: `Then ${c.fmtYear(last + 1)} … ${c.fmtYear(last + E.repeat)}, ${c.fmtYear(last + E.repeat + 1)} …` }); sample.push(last + 1, last + E.repeat + 1); }
+      }
+      const now = p.latestPresent();
+      if (now) { const r = c.fromDay(p.gOf(now) - c.epoch); sample.push(c.numY(r.y, r.d)); this.eraEl.createDiv({ text: `The present day falls in ${c.yearText(r.y, r.d)}.` }); }
+      const bad = [...new Set(sample)].filter((y) => c.yp(c.fmtYear(y)) !== y);
+      if (bad.length) this.eraEl.createDiv({ cls: 'ls-ce-error', text: `${bad.slice(0, 4).map((y) => `"${c.fmtYear(y)}"`).join(', ')} can't be told apart from another year. Give ${bad.length === 1 ? 'its era' : 'those eras'} a short form, or change how ${bad.length === 1 ? 'it counts' : 'they count'}.` });
+    }
+    if (this.weekEl) {
+      this.weekEl.empty();
+      const T = this.st.weekLike ? p.calendars().find((x) => x.name === this.st.weekLike) : null;
+      const wl = c.year(1).weekdays;
+      if (T && wl.length) {
+        const tl = T.weekSets[0] ? T.weekSets[0].list : [];
+        if (tl.length !== wl.length) this.weekEl.createDiv({ cls: 'ls-ce-error', text: `This week has ${wl.length} days and ${T.the()}'s has ${tl.length}, so they can't keep step.` });
+        else this.weekEl.createDiv({ text: wl.map((w, i) => `${w} = ${tl[i]}`).join(', ') + '.' });
+      }
+    }
+    if (this.nyEl) {
+      this.nyEl.empty();
+      if (this.st.newYear.trim()) {
+        if (!c.ny) this.nyEl.createDiv({ cls: 'ls-ce-error', text: `Write a day and a month, like "1 June".` });
+        else {
+          const B = 1000;
+          const n0 = c.nyDoy(B);
+          if (n0 === 1 && c.ny.day === 1 && !c.year(B).months.some((m) => m.name.toLowerCase() === c.ny.month || m.aliases.some((a) => a.toLowerCase() === c.ny.month))) {
+            this.nyEl.createDiv({ cls: 'ls-ce-error', text: `"${c.ny.text}" isn't a month on this calendar.` });
+          } else {
+            const Y = c.numY(B, n0);
+            const last = { y: c.next(B), d: c.nyDoy(c.next(B)) - 1 };
+            const lastPt = last.d >= 1 ? last : { y: B, d: c.year(B).yearDays };
+            this.nyEl.createDiv({ text: `So the year ${c.fmtYear(Y)} runs from ${c.dateText({ y: B, d: n0 })} to ${c.dateText(lastPt)}, the day before the next New Year. A date like ${c.dateText({ y: c.next(B), d: 1 })} belongs to that year too, so write dates (and the line-up) the way this calendar numbers them.` });
+          }
+        }
+      }
+    }
+    if (this.useEl) {
+      this.useEl.empty();
+      for (const [k, lab] of [['useFrom', 'From'], ['useUntil', 'Until']]) {
+        const v = this.st[k].trim();
+        if (!v) continue;
+        const pt = p.toPt(v, c);
+        if (!pt) { this.useEl.createDiv({ cls: 'ls-ce-error', text: `Can't read "${v}" as a date.` }); continue; }
+        this.useEl.createDiv({ text: `${lab} ${pt.cal.dateText(pt)}${pt.cal !== c && pt.cal.id !== this.file.path ? ` (${pt.cal.name})` : ''}.` });
+      }
+    }
+    if (!this.alignEl) return;
+    this.alignEl.empty();
+    if (pv.err) { this.alignEl.createDiv({ cls: 'ls-ce-error', text: pv.err }); return; }
+    if (!this.st.alignLeft.trim() && !this.st.alignRight.trim()) {
+      this.alignEl.createDiv({ text: `Not lined up yet: year 1 begins on the same day as on ${p.primaryCal().the()}.` });
+    }
+    const lines = [];
+    const other = pv.other || p.primaryCal();
+    const now = p.latestPresent();
+    if (now) {
+      const gn = p.gOf(now);
+      const r = c.fromDay(gn - c.epoch);
+      lines.push(`The present day (${now.raw || p.dateText(now)}) is ${now.d != null ? c.dateText(r) : 'in ' + c.yearText(r.y, null)} here.`);
+    }
+    for (const l of lines) this.alignEl.createDiv({ text: l });
+    if (other.broken) return;
+    /* Do the years keep step? Same average length: the same months stay together forever. */
+    const avg = (x) => x.monthSets[0].avg;
+    const a1 = avg(c), a2 = avg(other);
+    const n = (x) => (Math.round(x * 10000) / 10000).toString();
+    if (Math.abs(a1 - a2) > 1e-6) {
+      const drift = Math.abs(a1 - a2);
+      this.alignEl.createDiv({ cls: 'ls-ce-error', text: `This calendar's year is ${n(a1)} days and ${other.the()}'s is ${n(a2)}, so they drift ${n(drift)} day${drift === 1 ? '' : 's'} apart every year: the line-up day matches, but a century away the months are ${fmtNum(Math.round(drift * 100))} days out. If their months are meant to keep step, give both the same months and leap days.` });
+    } else this.alignEl.createDiv({ text: `Both years are ${n(a1)} days long, so the two calendars keep step forever.` });
+    /* Month by month, around the line-up day. */
+    const lp = c.parse(this.st.alignLeft);
+    const base = lp && lp.d != null ? lp : { y: 1, d: 1 };
+    const gb = c.epoch + c.toDay(base.y, c.monthAt(base.y, base.d).start + 1);
+    const tbl = this.alignEl.createDiv('ls-ce-monthmap');
+    let gm = gb;
+    for (let i = 0; i < Math.min(13, c.year(base.y).months.length + 1); i++) {
+      const here = c.fromDay(gm - c.epoch);
+      const there = other.fromDay(gm - other.epoch);
+      const row = tbl.createDiv('ls-ce-monthmap-row');
+      row.createSpan({ text: c.dateText(here) });
+      row.createSpan({ cls: 'ls-muted', text: '=' });
+      row.createSpan({ text: other.dateText(there) });
+      gm += c.monthAt(here.y, here.d).days;
+    }
+  }
+
+  async save() {
+    const p = this.plugin;
+    const s = this.st;
+    const f = this.file;
+    const months = s.months.filter((m) => m.name.trim()).map((m) => {
+      const parts = [m.name.trim(), String(Math.max(0, Math.round(Number(m.days)) || 0))];
+      if (m.leap.trim()) parts.push(m.leap.trim());
+      return parts.join(', ');
+    });
+    const moons = s.moons.filter((m) => m.name.trim() && Number(m.cycle) > 0).map((m) => `${m.name.trim()}, ${Number(m.cycle)}, ${Number(m.offset) || 0}`);
+    const weekdays = parseWeekdayLines(s.weekdays);
+    await this.app.fileManager.processFrontMatter(f, (fm) => {
+      fm.type = 'calendar';
+      const set = (k, v) => { if (v === '' || v == null || (Array.isArray(v) && !v.length)) delete fm[k]; else fm[k] = v; };
+      set('short', s.short.trim());
+      set('color', s.color);
+      fm.custom_calendar = !!s.custom;
+      /* Eras now live in the ## Eras section; the old era properties go. */
+      for (const k of ['custom_eras', 'backward_eras', 'forward_era', 'year_zero', 'backward_style', 'backward_position', 'forward_position', 'age_length', 'age_format', 'age_word']) delete fm[k];
+      const o = this.eraOpts();
+      set('era_repeat', o.repeat);
+      set('era_format', o.fmt);
+      set('era_word', s.eraWord.trim());
+      set('no_year_zero', s.noZero ? true : null);
+      set('week_like', s.weekLike || '');
+      set('new_year', s.newYear.trim());
+      set('new_year_numbering', s.newYear.trim() && s.newYearByEnd ? 'end' : '');
+      set('in_use_from', s.useFrom.trim());
+      set('in_use_until', s.useUntil.trim());
+      if (!this.isPrimary) {
+        const a = s.alignLeft.trim(), b = s.alignRight.trim();
+        if (a && b) { fm.align = `${a} = ${b}`; delete fm.epoch_day; } else if (!a && !b) delete fm.align;
+      }
+      set('kept_by', s.keptBy);
+      if (this.isPrimary || s.makePrimary) set('present', s.present.trim());
+    });
+    const indexed = p.nextMetaChange(f.path);
+    await this.app.vault.process(f, (d) => {
+      const sp = splitFm(d);
+      return sp.fm + editBody(sp.body, (pp) => {
+        const put = (name, lines) => {
+          let sec = pp.sections.find((x) => x.name.trim().toLowerCase() === name.toLowerCase());
+          const comments = sec ? (sec.lines.join('\n').match(/%%[\s\S]*?%%/g) || []) : [];
+          const out = [...comments, lines.map((l) => `- ${l}`).join('\n')].filter(Boolean).join('\n');
+          if (!sec) { sec = { name, lines: [] }; const hist = pp.sections.findIndex((x) => /^history/i.test(x.name)); if (hist >= 0) pp.sections.splice(hist, 0, sec); else pp.sections.push(sec); }
+          sec.lines = ['', ...out.split('\n')];
+        };
+        if (s.custom) { put('Months', months); put('Weekdays', weekdays); }
+        pp.sections = pp.sections.filter((x) => !/^ages\s*$/i.test(x.name.trim()));
+        const eras = this.eraList();
+        const E = new Eras(eras, this.eraOpts());
+        if (E.isDefault && !pp.sections.some((x) => /^eras\s*$/i.test(x.name.trim()))) { /* plain BC and years: nothing to write */ } else put('Eras', eras.map((e) => eraLine(e)));
+        put('Moons', moons);
+      });
+    });
+    await indexed;
+    p._calTexts = p._calTexts || new Map();
+    p._calTexts.set(f.path, await this.app.vault.read(f));
+    p.dropCalendar();
+    const cal = p.world().byFile.get(f.path);
+    if (s.makePrimary && cal) await p.makePrimary(cal);
+    if (sanitize(s.name) && sanitize(s.name) !== f.basename) {
+      const oldId = f.path;
+      await p.renameEntity(f, s.name);
+      const cv = p.settings.calendarView;
+      if (cv.cal === oldId) cv.cal = f.path;
+      if (cv.compare === oldId) cv.compare = f.path;
+      if (p.settings.timeline.cal === oldId) p.settings.timeline.cal = f.path;
+      await p.saveSettings();
+    }
+    p.dropCalendar();
+    p.rerenderViews();
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
+/* "New calendar": a name and somewhere to start from. */
+class NewCalendarModal extends Modal {
+  constructor(app, plugin, onSubmit) { super(app); this.plugin = plugin; this.onSubmit = onSubmit; this.tpl = 'blank'; this.copy = ''; }
+  onOpen() {
+    const p = this.plugin;
+    this.titleEl.setText('New calendar');
+    const el = this.contentEl;
+    el.addClass('ls-new-cal');
+    const name = el.createEl('input', { type: 'text', cls: 'ls-full', attr: { placeholder: 'Calendar name, like Elven Reckoning' } });
+    el.createDiv({ cls: 'ls-pv-label', text: 'Start from' });
+    const list = el.createDiv('ls-new-cal-list');
+    const opts = Object.entries(CAL_TEMPLATES).map(([k, t]) => ({ key: k, label: t.label, desc: t.desc }));
+    for (const c of p.calendars()) if (c.file) opts.push({ key: `copy:${c.id}`, label: `A copy of ${c.name}`, desc: 'Same months, week and eras, ready to change.' });
+    const draw = () => {
+      list.empty();
+      for (const o of opts) {
+        const r = list.createDiv({ cls: 'ls-new-cal-opt' + ((this.copy ? `copy:${this.copy}` : this.tpl) === o.key ? ' is-active' : ''), attr: { tabindex: '0', role: 'radio' } });
+        r.createDiv({ cls: 'ls-new-cal-name', text: o.label });
+        r.createDiv({ cls: 'ls-muted', text: o.desc });
+        const pick = () => { if (o.key.startsWith('copy:')) { this.copy = o.key.slice(5); } else { this.copy = ''; this.tpl = o.key; } draw(); };
+        r.addEventListener('click', pick);
+        r.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+      }
+    };
+    draw();
+    const go = () => { const n = name.value.trim(); if (!n) { name.focus(); return; } this.close(); this.onSubmit(n, this.tpl, this.copy || null); };
+    name.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    const a = el.createDiv('ls-modal-actions');
+    textBtn(a, 'Cancel', () => this.close());
+    textBtn(a, 'Create calendar', go, 'mod-cta');
+    window.setTimeout(() => name.focus(), 30);
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
+/* Type a date in any calendar; see it in all of them. */
+class ConvertDateModal extends Modal {
+  constructor(app, plugin) { super(app); this.plugin = plugin; }
+  onOpen() {
+    const p = this.plugin;
+    this.titleEl.setText('Convert a date');
+    const el = this.contentEl;
+    el.addClass('ls-convert');
+    const inp = el.createEl('input', { type: 'text', cls: 'ls-full', attr: { placeholder: 'A date in any calendar, like "3 Ember, 400" or "Elven: 3 Ember 400"' } });
+    const out = el.createDiv('ls-convert-out');
+    const run = () => {
+      out.empty();
+      const v = inp.value.trim();
+      if (!v) { out.createDiv({ cls: 'ls-muted', text: `Your calendars: ${p.calendars().map((c) => c.name).join(', ')}.` }); return; }
+      const pt = p.toPt(v);
+      if (!pt) { out.createDiv({ cls: 'ls-muted', text: 'Can\'t read that as a date yet.' }); return; }
+      if (pt.d == null) out.createDiv({ cls: 'ls-hint', text: 'No day and month, so this converts the middle of the year.' });
+      for (const c of p.calendars()) {
+        if (c.broken) continue;
+        const q = p.inCal(pt, c);
+        const r = out.createDiv(`ls-cal-other ls-c-${c.color}` + (c === pt.cal ? ' is-source' : ''));
+        r.createSpan('ls-cal-other-dot');
+        const t = r.createDiv('ls-cal-other-text');
+        t.createDiv({ cls: 'ls-cal-other-name', text: c.name + (c === pt.cal ? ' (as written)' : '') });
+        const wd = q.d != null ? c.weekday(q.y, q.d) : null;
+        t.createDiv({ text: [wd, q.d != null ? c.dateText(q) : c.fmtYear(q.y)].filter(Boolean).join(', ') });
+        iconBtn(r, 'copy', 'Copy', () => { const s = q.d != null ? p.dateLabel(q) : c.fmtYear(q.y); navigator.clipboard.writeText(s).then(() => new Notice(`Copied "${s}"`)); });
+      }
+    };
+    inp.addEventListener('input', run);
+    run();
+    window.setTimeout(() => inp.focus(), 30);
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
 class LoresmithSettingTab extends PluginSettingTab {
   constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
   display() {
@@ -11542,56 +13830,46 @@ class LoresmithSettingTab extends PluginSettingTab {
 
     const proj = this.plugin.settings.activeProject;
     const p = this.plugin;
-    const model = p.calModel();
-    const noteFile = p.calNoteFile();
-    new Setting(containerEl).setName(proj ? `World calendar for ${proj}` : 'World calendar').setHeading();
-    const summary = containerEl.createDiv('setting-item-description ls-cal-status');
-    {
-      const now = p.latestPresent();
-      const c = p.calendar(now ? now.y : undefined);
-      const parts = [];
-      if (model.broken) parts.push('Custom calendar, but no months yet: add them in the calendar note.');
-      else if (!model.custom) parts.push('Modern calendar (January to December, leap years, real weekdays and moon).');
-      else if (c) parts.push(`Custom calendar: ${c.months.length} months, ${c.yearDays} days a year${c.weekdays.length ? `, ${c.weekdays.length}-day week` : ''}${c.moons.length ? `, ${c.moons.length} moon${c.moons.length === 1 ? '' : 's'}` : ''}.`);
-      const changes = model.monthSets.filter((s) => s.from !== -Infinity).length;
-      if (changes) parts.push(`Changes ${changes} time${changes === 1 ? '' : 's'} in its history.`);
-      if (model.holidays.length) parts.push(`${model.holidays.length} holiday${model.holidays.length === 1 ? '' : 's'}.`);
-      parts.push(now ? `Present: ${now.raw}${model.present ? '' : p.scanPresent() ? ' (latest story date)' : ' (today)'}.` : 'No present date yet.');
-      summary.setText(parts.join(' '));
-    }
-    const set = async (props) => { await p.setCalendarProps(props); this.display(); };
-
-    new Setting(containerEl)
-      .setName('Custom calendar')
-      .setDesc('Off: the modern calendar. On: your own month names and lengths, weekdays and moons, written in the calendar note.')
-      .addToggle((t) => t.setValue(model.custom).onChange((v) => set({ custom_calendar: v })));
-    new Setting(containerEl)
-      .setName('Custom eras')
-      .setDesc('Off: years count like ours (300 BC, 2026). On: name your own eras.')
-      .addToggle((t) => t.setValue(model.eras.custom).onChange((v) => set({ custom_eras: v })));
-    /* Text fields save when you leave them, so the note isn't rewritten on every keystroke. */
-    const field = (name, desc, placeholder, value, key) => new Setting(containerEl).setName(name).setDesc(desc).addText((t) => {
-      t.setPlaceholder(placeholder).setValue(value);
-      t.inputEl.addEventListener('change', () => set({ [key]: t.getValue().trim() }));
+    const cals = p.projectPath() ? p.calendars() : [];
+    new Setting(containerEl).setName(proj ? `Calendars for ${proj}` : 'Calendars').setHeading();
+    containerEl.createDiv({
+      cls: 'setting-item-description ls-cal-status',
+      text: 'A project can keep as many calendars as its cultures use. They all line up on the same days, so a date written in one shows on the right day of every other. The primary calendar reads dates that don\'t say which calendar they\'re in, and its years are the ones shown on ages, roles and the timeline (which can switch calendars).',
     });
-    if (model.eras.custom) {
-      field('Eras that count backwards', 'Comma separated. A date like "300 Before Glass" sorts as -300. The first one is used when showing years.', 'BC, BCE', model.eras.neg.join(', '), 'backward_eras');
-      field('Era after year 1', 'Shown after years that count forwards: "AC" turns 1023 into "1023 AC". Leave empty for just the number.', 'AC', model.eras.fwd, 'forward_era');
-      new Setting(containerEl)
-        .setName('Year 0')
-        .setDesc('Off: the year before 1 is 1 in the backwards era. On: a year 0 sits between them.')
-        .addToggle((t) => t.setValue(model.eras.zero).onChange((v) => set({ year_zero: v })));
+    for (const c of cals) {
+      const y = c.broken ? null : c.year(1);
+      const seg = c.monthSets[0];
+      const what = c.broken ? 'No months yet.'
+        : seg.modern ? 'Modern calendar.'
+          : `${y.months.length} months, ${fmtNum(seg.base)} days a year${seg.months.some((m) => m.leap) ? ' (with leap years)' : ''}${y.weekdays.length ? `, ${y.weekdays.length}-day week` : ''}.`;
+      const kept = c.model.keptBy.map((l) => linkText(l)).join(', ');
+      const ut = p.useText(c);
+      const desc = [what, c === p.primaryCal() ? 'Primary.' : c.alignError ? c.alignError : c.unaligned ? 'Not lined up yet.' : '', ut && `${cap(ut)}.`, kept && `Kept by ${kept}.`, c.holidays.length && `${c.holidays.length} holiday${c.holidays.length === 1 ? '' : 's'}.`].filter(Boolean).join(' ');
+      const s = new Setting(containerEl).setName(c.name + (c === p.primaryCal() ? ' (primary)' : '')).setDesc(desc);
+      s.addButton((b) => b.setButtonText('Edit').onClick(() => p.editCalendar(c)));
+      if (c.file) s.addExtraButton((b) => b.setIcon('file-text').setTooltip('Open as note').onClick(() => p.openNote(c.file)));
+      if (c.file && c !== p.primaryCal()) s.addExtraButton((b) => b.setIcon('star').setTooltip('Make primary').onClick(async () => { await p.makePrimary(c); this.display(); }));
     }
-    const today = p.defaultPresent();
-    field('Present date', `The world's "now", used for ages and "years ago" when no story, chapter or scene sets its own.${today ? ` Leave empty for today (${today.raw}).` : ''}`,
-      today ? today.raw : '12 Frostmoon, 1023 AC', model.present == null ? '' : String(model.present), 'present');
-    new Setting(containerEl)
-      .setName('Calendar note')
-      .setDesc('Month names and lengths, weekdays, moons, and a History section for holidays (with the years they were kept) and calendar changes.')
-      .addButton((b) => b.setButtonText(noteFile ? 'Open' : 'Create').setCta().onClick(async () => {
-        await p.openCalendarNote();
-        this.display();
-      }));
+    if (p.projectPath()) {
+      new Setting(containerEl)
+        .setName('New calendar')
+        .setDesc('For another culture\'s reckoning, a calendar that replaced an older one, or anything else your world counts days by.')
+        .addButton((b) => b.setButtonText('New calendar').setCta().onClick(() => p.newCalendarFlow(() => this.display())));
+      const now = p.latestPresent();
+      const w = p.world();
+      new Setting(containerEl)
+        .setName('Present date')
+        .setDesc(`The world's "now", used for ages and "years ago" when no story, chapter or scene sets its own. Write it in any calendar. ${now ? `Now: ${now.raw || p.dateText(now)}${w.present ? '' : p.scanPresent() ? ' (latest story date)' : ' (today)'}.` : ''}`)
+        .addText((t) => {
+          const today = p.defaultPresent();
+          t.setPlaceholder(today ? today.raw : '12 Frostmoon, 1023 AC').setValue(w.present == null ? '' : String(w.present));
+          t.inputEl.addEventListener('change', async () => { await p.setCalendarProps({ present: t.getValue().trim() || null }, p.primaryCal().file || null); this.display(); });
+        });
+      new Setting(containerEl)
+        .setName('Convert a date')
+        .setDesc('Type a date in any of your calendars and see it in all of them.')
+        .addButton((b) => b.setButtonText('Convert').onClick(() => new ConvertDateModal(this.app, p).open()));
+    }
 
     new Setting(containerEl).setName('Generators').setHeading();
     const genFolder = this.plugin.genInstallFolder();

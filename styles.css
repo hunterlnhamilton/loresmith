@@ -1136,7 +1136,7 @@ button.ls-ol-addcard svg { width: var(--icon-xs); height: var(--icon-xs); }
 
 /* Year view */
 .ls-cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--size-4-4); }
-.ls-cal-title { font-weight: var(--font-semibold); color: var(--color-yellow); margin-bottom: var(--size-4-1); }
+.ls-cal-title { font-weight: var(--font-semibold); color: var(--ls-accent, var(--color-yellow)); }
 .ls-cal-title.is-link { cursor: pointer; width: fit-content; }
 .ls-cal-title.is-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .ls-cal-grid { display: grid; grid-template-columns: repeat(var(--ls-cal-cols, 7), minmax(0, 1fr)); gap: 2px; }
@@ -1175,7 +1175,7 @@ button.ls-ol-addcard svg { width: var(--icon-xs); height: var(--icon-xs); }
 .ls-cal-detail { flex: 1 1 260px; min-width: 0; padding: var(--size-4-3); border-radius: var(--radius-m); background: var(--background-secondary); display: flex; flex-direction: column; gap: var(--size-4-3); }
 .ls-cal-detail-head { display: flex; align-items: flex-start; gap: var(--size-4-1); }
 .ls-cal-detail-titles { flex: 1; min-width: 0; }
-.ls-cal-detail-title { font-weight: var(--font-semibold); font-size: var(--font-ui-medium); color: var(--color-yellow); }
+.ls-cal-detail-title { font-weight: var(--font-semibold); font-size: var(--font-ui-medium); color: var(--ls-accent, var(--color-yellow)); }
 .ls-cal-detail-moons { display: flex; flex-direction: column; gap: var(--size-4-1); }
 .ls-cal-detail-moon { display: flex; align-items: center; gap: var(--size-4-2); font-size: var(--font-ui-small); }
 .ls-cal-detail-moon .ls-muted { margin-left: auto; }
@@ -2020,3 +2020,151 @@ button.ls-sub-chip.is-nested::before { content: '↳ '; opacity: 0.6; }
   padding: var(--size-4-2) var(--size-4-3); border-radius: var(--radius-m);
   border: 1px solid var(--color-orange); background: rgba(var(--color-orange-rgb), 0.08);
 }
+
+/* ------------------------------------------------------------------ */
+/* Several calendars: pickers, the calendar alongside, conversions      */
+/* ------------------------------------------------------------------ */
+.ls-cal-pick { display: inline-flex; align-items: center; gap: 6px; padding-left: 8px; border-left: 3px solid var(--ls-accent); }
+.ls-cal-pick-label { color: var(--text-muted); font-size: var(--font-ui-smaller); white-space: nowrap; }
+.ls-cal-pick select { max-width: 13em; }
+.ls-cal-go { width: 11em; }
+.ls-cal-tag {
+  display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px;
+  border: 1px solid var(--ls-accent); color: var(--ls-accent);
+  font-size: var(--font-ui-smaller); font-weight: var(--font-normal); white-space: nowrap; vertical-align: middle;
+}
+.ls-cal-warn { margin: 0 0 var(--size-4-3); padding: var(--size-4-2) var(--size-4-3); border-radius: var(--radius-m); border: 1px dashed var(--color-orange); color: var(--text-muted); font-size: var(--font-ui-small); }
+.ls-cal-warn.is-link { cursor: pointer; }
+.ls-cal-warn.is-link:hover { color: var(--text-normal); }
+
+/* The same day in the calendar shown alongside */
+.ls-cal-alt { color: var(--ls-accent); font-size: var(--font-ui-smaller); line-height: 1.2; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ls-cal-alt.is-start { font-weight: var(--font-semibold); opacity: 1; }
+.ls-cal-day.is-alt-start { box-shadow: inset 2px 0 0 var(--background-modifier-border-hover); }
+.ls-cal-alt-mark { margin-left: auto; margin-right: 2px; color: var(--ls-accent); font-size: 9px; font-weight: var(--font-semibold); text-transform: uppercase; }
+.ls-cal-title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 var(--size-4-2); margin-bottom: var(--size-4-1); }
+.ls-cal-title-alt { color: var(--ls-accent); font-size: var(--font-ui-smaller); }
+.ls-cal-alt-head { margin: calc(-1 * var(--size-4-1)) 0 var(--size-4-2); color: var(--ls-accent); font-size: var(--font-ui-small); }
+.ls-cal-agenda-when .ls-cal-alt { font-size: var(--font-ui-smaller); }
+
+/* Holidays and dates from other calendars */
+.ls-cal-holiday.is-foreign { color: var(--ls-accent); font-style: normal; }
+.ls-cal-holiday.is-foreign::before { content: '◆ '; font-size: 0.8em; opacity: 0.8; }
+.ls-cal-detail-holiday.is-foreign .ls-cal-detail-holiday-icon { color: var(--ls-accent); }
+.ls-cal-item.is-foreign { border-left-style: double; border-left-width: 3px; }
+.ls-cal-key.ls-tl-holiday .ls-cal-swatch { background: transparent; border: 1px solid var(--color-yellow); border-radius: 50%; }
+.ls-cal-key.ls-tl-foreign .ls-cal-swatch { background: transparent; border: none; width: auto; height: auto; }
+.ls-cal-key.ls-tl-foreign .ls-cal-swatch::before { content: '◆'; color: var(--text-muted); font-size: 10px; }
+
+/* The same day on every calendar (day details, converter) */
+.ls-cal-detail-others { display: flex; flex-direction: column; gap: 4px; }
+.ls-cal-other {
+  display: flex; align-items: center; gap: var(--size-4-2);
+  padding: 4px var(--size-4-2); border-radius: var(--radius-s);
+  background: var(--background-primary); border-left: 3px solid var(--ls-accent);
+  font-size: var(--font-ui-small); cursor: pointer;
+}
+.ls-cal-other:hover { background: var(--background-modifier-hover); }
+.ls-cal-other.is-source { background: color-mix(in srgb, var(--ls-accent) 12%, var(--background-primary)); }
+.ls-cal-other-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--ls-accent); }
+.ls-cal-other-text { flex: 1; min-width: 0; }
+.ls-cal-other-name { color: var(--ls-accent); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
+.ls-convert { display: flex; flex-direction: column; gap: var(--size-4-3); }
+.ls-convert-out { display: flex; flex-direction: column; gap: 4px; }
+.ls-convert .ls-cal-other { cursor: default; }
+
+/* Calendar editor */
+.modal.ls-cal-editor-modal { width: min(760px, 96vw); }
+.ls-cal-editor { display: flex; flex-direction: column; gap: var(--size-4-4); }
+.ls-ce-sec { display: flex; flex-direction: column; gap: var(--size-4-2); padding-bottom: var(--size-4-3); border-bottom: 1px solid var(--background-modifier-border); }
+.ls-ce-sec h3 { margin: 0; font-size: var(--font-ui-medium); }
+.ls-ce-sec .ls-hint { font-style: normal; }
+.ls-ce-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--size-4-3); }
+.ls-ce-field { display: flex; flex-direction: column; gap: 2px; flex: 1 1 12em; min-width: 0; }
+.ls-ce-label { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.ls-ce-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-ui-small); cursor: pointer; }
+.ls-ce-note { padding: var(--size-4-2) var(--size-4-3); border-radius: var(--radius-s); background: var(--background-secondary); color: var(--text-muted); font-size: var(--font-ui-small); }
+.ls-ce-radio { max-width: 420px; }
+.ls-ce-table { display: flex; flex-direction: column; gap: 4px; }
+.ls-ce-tr { display: grid; grid-template-columns: minmax(0, 1.6fr) 5.5em minmax(0, 2fr) 5.5em; gap: var(--size-4-2); align-items: center; }
+.ls-ce-moons .ls-ce-tr { grid-template-columns: minmax(0, 1.6fr) 7em 7em 2.5em; }
+.ls-ce-tr.is-head { color: var(--text-faint); font-size: var(--font-ui-smaller); }
+.ls-ce-tr input { width: 100%; min-width: 0; }
+.ls-ce-tools { display: flex; justify-content: flex-end; }
+.ls-ce-tools .ls-icon-btn { padding: 2px; }
+.ls-ce-summary { color: var(--text-muted); font-size: var(--font-ui-small); display: flex; flex-direction: column; gap: 2px; }
+.ls-ce-error { color: var(--text-error); }
+.ls-ce-align { align-items: center; }
+.ls-ce-eq { flex: none; align-self: flex-end; padding-bottom: 6px; color: var(--text-muted); font-weight: var(--font-semibold); }
+.ls-ce-week { width: 100%; font-family: var(--font-text); resize: vertical; }
+@media (max-width: 600px) {
+  .ls-ce-tr { grid-template-columns: 1fr 4.5em; }
+  .ls-ce-tr > :nth-child(3) { grid-column: 1 / -1; }
+  .ls-ce-tr.is-head { display: none; }
+  .ls-ce-moons .ls-ce-tr { grid-template-columns: 1fr 1fr 1fr auto; }
+}
+
+/* New calendar */
+.ls-new-cal { display: flex; flex-direction: column; gap: var(--size-4-2); }
+.ls-new-cal-list { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
+.ls-new-cal-opt { padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); cursor: pointer; }
+.ls-new-cal-opt:hover { border-color: var(--interactive-accent); }
+.ls-new-cal-opt.is-active { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
+.ls-new-cal-opt:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 1px; }
+.ls-new-cal-name { font-weight: var(--font-semibold); }
+
+/* Ages */
+.ls-cal-age { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--size-4-2); margin: calc(-1 * var(--size-4-1)) 0 var(--size-4-3); font-size: var(--font-ui-small); }
+.ls-cal-age-name { color: var(--ls-accent); font-weight: var(--font-semibold); }
+.ls-tl-era.is-age { display: flex; align-items: baseline; gap: var(--size-4-2); font-size: 1.25em; padding-bottom: 2px; border-bottom: 1px solid var(--background-modifier-border); }
+.ls-tl-age-span { color: var(--text-faint); font-size: var(--font-ui-small); font-weight: var(--font-normal); }
+.ls-ce-ages .ls-ce-tr { grid-template-columns: minmax(0, 1.6fr) 6em 7em 5.5em; }
+@media (max-width: 600px) { .ls-ce-ages .ls-ce-tr { grid-template-columns: 1fr 4.5em 5em; } .ls-ce-ages .ls-ce-tools { grid-column: 1 / -1; } }
+
+/* Years and eras groups in the calendar editor */
+.ls-ce-group { display: flex; flex-direction: column; gap: 4px; }
+.ls-ce-sub { color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
+.ls-ce-field select.dropdown { width: 100%; }
+
+/* Eras editor, calendars in use */
+.ls-ce-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ls-ce-eras { display: flex; flex-direction: column; gap: var(--size-4-2); }
+.ls-ce-era { display: flex; flex-direction: column; gap: var(--size-4-2); padding: var(--size-4-2) var(--size-4-3); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); background: var(--background-secondary); }
+.ls-ce-era .ls-ce-row { align-items: flex-end; }
+.ls-ce-field.is-narrow { flex: 0 1 7em; }
+.ls-ce-inline { display: flex; gap: 6px; }
+.ls-ce-inline select { flex: 1 1 auto; min-width: 0; }
+.ls-ce-inline input { flex: 0 0 6em; width: 6em; }
+.ls-ce-era .ls-ce-tools { align-self: flex-end; padding-bottom: 4px; }
+.ls-ce-era-span { color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.ls-ce-era-span:empty { display: none; }
+.ls-cal-other.is-unused { opacity: 0.55; }
+.ls-tl-era.is-cal { color: var(--ls-accent); border-bottom: 2px solid var(--ls-accent); margin-top: var(--size-4-4); }
+
+/* A holiday's dates on several calendars */
+.ls-hol-dates { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.ls-hol-date { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.ls-hol-date select { flex: 0 1 12em; min-width: 0; }
+.ls-hol-date .ls-input { flex: 1 1 10em; min-width: 0; }
+.ls-hol-date .ls-hol-years { flex: 0 1 9em; }
+.ls-hol-dates > .ls-chip-add { align-self: flex-start; }
+
+/* Days that belong to the year before or after, when the New Year falls partway through a month */
+.ls-cal-day.is-other-year { opacity: 0.4; }
+
+/* Line-up check: this calendar's months against the other's */
+.ls-ce-monthmap { display: grid; grid-template-columns: max-content max-content 1fr; gap: 0 var(--size-4-2); margin-top: 4px; font-size: var(--font-ui-smaller); }
+.ls-ce-monthmap-row { display: contents; }
+
+/* Sorting locations into nations, regions and settlements */
+.ls-sorter { display: flex; flex-direction: column; gap: 4px; max-height: 55vh; overflow-y: auto; margin: var(--size-4-2) 0; }
+.ls-sorter-row { display: flex; align-items: center; justify-content: space-between; gap: var(--size-4-3); padding: 4px 0; border-bottom: 1px solid var(--background-modifier-border); }
+.ls-sorter-name { display: flex; flex-direction: column; min-width: 0; }
+.ls-sorter-name .ls-muted { font-size: var(--font-ui-smaller); }
+.ls-sorter-row select { flex: none; }
+
+/* Events lasting several days: one bar across the days */
+.ls-cal-item.is-span-mid, .ls-cal-item.is-span-last { opacity: 0.8; }
+.ls-cal-item.is-span-first { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ls-cal-item.is-span-mid { border-radius: 0; }
+.ls-cal-item.is-span-last { border-top-left-radius: 0; border-bottom-left-radius: 0; }
