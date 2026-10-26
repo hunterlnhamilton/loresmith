@@ -70,16 +70,18 @@ Everything is a normal markdown note.
 ```
 Lore/
   Example Project/              ← a project
+    Arcs
+    Bestiary
     Calendar.md                 ← the primary calendar
-    Calendars/Coastal Calendar.md
-    Characters/Elena Hart.md
-    Nations/Kingdom of Westmarch.md
-    Regions/Grey Mountains.md
-    Settlements/Kingsport.md
-    Locations/The Crooked Lantern.md
-    Organizations/Lantern Guild.md
-    Events/Siege of Kingsport.md
-    Holidays/Midwinter Feast.md
+    Calendars/Westerosi Calendar.md
+    Characters/Daenerys Targaryen.md
+    Nations/Westeros.md
+    Regions/The North.md
+    Settlements/King's Landing.md
+    Locations/Crossroads Inn.md
+    Organizations/The Night's Watch.md
+    Events/The Red Wedding.md
+    Holidays/Maiden’s Day.md
     Stories/
       First Draft/
         First Draft.md          ← story note: synopsis, main characters, chapter order
