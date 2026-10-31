@@ -13,6 +13,8 @@ const {
 } = require('obsidian');
 let CM_VIEW = null;
 try { CM_VIEW = require('@codemirror/view'); } catch (e) { /* hover definitions are optional */ }
+let GET_ICON = null;
+try { GET_ICON = require('obsidian').getIcon || null; } catch (e) { /* older Obsidian: icon pins fall back to shapes */ }
 let EDITOR_INFO = null;
 try { EDITOR_INFO = require('obsidian').editorInfoField || null; } catch (e) { /* older Obsidian */ }
 
@@ -22,6 +24,7 @@ const VIEW_CHAPTERS = 'loresmith-chapters';
 const VIEW_WEB = 'loresmith-web';
 const VIEW_OUTLINE = 'loresmith-outline';
 const VIEW_PANEL = 'loresmith-panel';
+const VIEW_MAP = 'loresmith-map';
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'avif'];
 const STATUSES = ['draft', 'revised', 'done'];
@@ -31,6 +34,218 @@ const TAXA = ['species', 'creature', 'plant'];
 const ANY = ['character', 'organization', 'culture', 'species', 'creature', 'plant', 'nation', 'region', 'settlement', 'location', 'discovery', 'item', 'event'];
 /* Every kind of place: nations (realms), regions (geography), settlements (cities, towns), locations (sites, buildings). */
 const PLACES = ['nation', 'region', 'settlement', 'location'];
+/* Entries with a beginning and (maybe) an end: how each says it. The dates live in `founded` and `dissolved`. */
+const FOUNDING = {
+  organization: { start: 'Founded', end: 'Dissolved', began: 'is founded', ended: 'is dissolved', stood: 'Lasted' },
+  nation: { start: 'Founded', end: 'Fell', began: 'is founded', ended: 'falls', stood: 'Stood for' },
+  region: { start: 'Formed', end: 'Ended', began: 'is formed', ended: 'comes to an end', stood: 'Lasted' },
+  settlement: { start: 'Founded', end: 'Ended', began: 'is founded', ended: 'comes to an end', stood: 'Stood for' },
+  location: { start: 'Built', end: 'Ended', began: 'is built', ended: 'comes to an end', stood: 'Stood for' },
+};
+/*
+ * Dated changes in a place's or group's history, kept as `changes:` lines on its note:
+ *   "Renamed from Port Aldis to Kingsport (1050 AD)"
+ *   "Conquered from [[Ferelden]] by [[Tevinter Imperium]] (12 Haring, 1102 AD), after a six-month siege"
+ *   "Destroyed by [[The Blight]] (1130 AD)"   "Rebuilt (1150 AD)"   "Became independent (1200 AD)"
+ * Anything else is kept as a plain dated note: "The great fire (1066 AD)".
+ * act: name (a new name), hands (a new holder), free (no holder), end (no longer standing), back (standing again), note.
+ */
+const CHANGE_KINDS = [
+  { key: 'renamed', label: 'Renamed', verb: 'Renamed', link: 'to', act: 'name', past: 'is renamed' },
+  { key: 'conquered', label: 'Conquered', verb: 'Conquered', link: 'by', act: 'hands', past: 'is conquered by' },
+  { key: 'annexed', label: 'Annexed', verb: 'Annexed', link: 'by', act: 'hands', past: 'is annexed by' },
+  { key: 'ceded', label: 'Ceded', verb: 'Ceded', link: 'to', act: 'hands', past: 'is ceded to' },
+  { key: 'passed', label: 'Changed hands', verb: 'Passed', link: 'to', act: 'hands', past: 'passes to' },
+  { key: 'granted', label: 'Granted', verb: 'Granted', link: 'to', act: 'hands', past: 'is granted to' },
+  { key: 'inherited', label: 'Inherited', verb: 'Inherited', link: 'by', act: 'hands', past: 'is inherited by' },
+  { key: 'sold', label: 'Sold', verb: 'Sold', link: 'to', act: 'hands', past: 'is sold to' },
+  { key: 'merged', label: 'Merged into', verb: 'Merged', link: 'into', act: 'hands', past: 'is merged into' },
+  { key: 'independent', label: 'Became independent', verb: 'Became independent', act: 'free', past: 'becomes independent' },
+  { key: 'besieged', label: 'Besieged', verb: 'Besieged', link: 'by', act: 'note', past: 'is besieged' },
+  { key: 'sacked', label: 'Sacked', verb: 'Sacked', link: 'by', act: 'note', past: 'is sacked' },
+  { key: 'occupied', label: 'Occupied', verb: 'Occupied', link: 'by', act: 'note', past: 'is occupied' },
+  { key: 'destroyed', label: 'Destroyed', verb: 'Destroyed', link: 'by', act: 'end', past: 'is destroyed' },
+  { key: 'razed', label: 'Razed', verb: 'Razed', link: 'by', act: 'end', past: 'is razed' },
+  { key: 'abandoned', label: 'Abandoned', verb: 'Abandoned', act: 'end', past: 'is abandoned' },
+  { key: 'ruined', label: 'Fell into ruin', verb: 'Fell into ruin', act: 'end', past: 'falls into ruin' },
+  { key: 'sunk', label: 'Sank or drowned', verb: 'Sank', act: 'end', past: 'sinks' },
+  { key: 'disbanded', label: 'Disbanded', verb: 'Disbanded', act: 'end', past: 'is disbanded' },
+  { key: 'rebuilt', label: 'Rebuilt', verb: 'Rebuilt', link: 'by', act: 'back', past: 'is rebuilt' },
+  { key: 'resettled', label: 'Resettled', verb: 'Resettled', link: 'by', act: 'back', past: 'is resettled' },
+  { key: 'restored', label: 'Restored', verb: 'Restored', link: 'by', act: 'back', past: 'is restored' },
+  { key: 'refounded', label: 'Refounded', verb: 'Refounded', link: 'by', act: 'back', past: 'is refounded' },
+  { key: 'other', label: 'Something else', verb: '', act: 'note', past: '' },
+];
+const CHANGE_OTHER = CHANGE_KINDS[CHANGE_KINDS.length - 1];
+/* The field that says who holds a place or group now, kept in step with the latest change of hands. */
+const HOLDER_FIELD = { settlement: 'nation', nation: 'partOf', organization: 'partOf' };
+function parseChange(raw) {
+  let t = String(raw == null ? '' : raw).trim();
+  if (!t) return null;
+  let when = '', note = '';
+  const m = t.match(/^(.*?)\s*\(([^()]*)\)\s*(?:[,;]\s*([\s\S]*))?$/);
+  if (m && m[1].trim()) { t = m[1].trim(); when = m[2].trim(); note = (m[3] || '').trim(); }
+  const low = t.toLowerCase();
+  const kinds = CHANGE_KINDS.filter((k) => k.verb).sort((a, b) => b.verb.length - a.verb.length);
+  for (const k of kinds) {
+    const v = k.verb.toLowerCase();
+    if (low !== v && !low.startsWith(v + ' ')) continue;
+    const rest = t.slice(v.length).trim();
+    const r = rest.match(/^(?:from\s+(.+?))?\s*(?:(?:by|to|into|as)\s+(.+))?$/i);
+    if (!r) break;
+    return { kind: k.key, k, when, from: (r[1] || '').trim(), target: (r[2] || '').trim(), note, raw: String(raw) };
+  }
+  return { kind: 'other', k: CHANGE_OTHER, when, from: '', target: '', note: note ? `${t}, ${note}` : t, raw: String(raw) };
+}
+function changeLine(c) {
+  const k = CHANGE_KINDS.find((x) => x.key === c.kind) || CHANGE_OTHER;
+  const tidy = (v) => oneLine(v).replace(/[()]/g, '');
+  const when = tidy(c.when);
+  if (k === CHANGE_OTHER) return c.note ? `${tidy(c.note)}${when ? ` (${when})` : ''}` : '';
+  const from = tidy(c.from), target = tidy(c.target);
+  const head = [k.verb, from && `from ${from}`, target && `${k.link || 'by'} ${target}`].filter(Boolean).join(' ');
+  return `${head}${when ? ` (${when})` : ''}${c.note ? `, ${oneLine(c.note)}` : ''}`;
+}
+/*
+ * Maps: a note with `type: map`, an `image`, and what is drawn on it, all as fractions of the image (0 to 1):
+ *   pins:   "[[Kingsport]] | 0.51234, 0.33410"
+ *   areas:  "[[Westmarch]] | 0.1200,0.3000 0.1800,0.3300 0.2000,0.4100 | red"   (the color is optional)
+ *   labels: "The Narrow Sea | 0.40000, 0.61000"
+ *   places: every linked entry, as plain links, so backlinks and the graph see them.
+ * A pin or area can name something without linking it: "Old watchtower | 0.2, 0.3".
+ * Any of them can carry the years it is shown, for borders that move: "[[Westmarch]] | ... | red | 900 – 1102".
+ */
+function splitMapLine(s) {
+  const m = String(s == null ? '' : s).match(/^\s*(\[\[[^\]]*\]\]|[^|]*?)\s*\|\s*([\s\S]*)$/);
+  if (!m) return null;
+  return [m[1].trim(), ...m[2].split('|').map((x) => x.trim())];
+}
+function parseMapPin(s) {
+  const a = splitMapLine(s);
+  if (!a) return null;
+  const n = (a[1] || '').split(/[\s,]+/).map(Number).filter((x) => Number.isFinite(x));
+  return n.length >= 2 ? { target: a[0], x: n[0], y: n[1], years: a.slice(2).find((x) => /\d/.test(x)) || '' } : null;
+}
+function parseMapArea(s) {
+  const a = splitMapLine(s);
+  if (!a) return null;
+  const pts = (a[1] || '').trim().split(/\s+/).map((q) => q.split(',').map(Number)).filter((q) => q.length === 2 && q.every(Number.isFinite));
+  const rest = a.slice(2);
+  return pts.length >= 3 ? { target: a[0], pts, color: rest.find(isMapColor) || '', years: rest.find((x) => /\d/.test(x) && !isMapColor(x)) || '' } : null;
+}
+/* Map colors: one of the theme's named colors ("red"), or any hex color ("#3a7bd5"). */
+function isMapColor(c) { return COLORS_ALL.includes(c) || /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(c || '')); }
+function colorClass(c) { return COLORS_ALL.includes(c) ? `ls-c-${c}` : isMapColor(c) ? 'ls-c-custom' : `ls-c-${c || 'base'}`; }
+function colorStyle(c) { return COLORS_ALL.includes(c) || !isMapColor(c) ? '' : `--ls-accent: ${c}`; }
+
+/*
+ * How a kind of place is drawn on maps, chosen per Type ("Capital City", "Port Town") in the map key.
+ *   marker  circle, ring, square, diamond, triangle, star, or icon:<lucide name>
+ *   size    small, medium, large
+ *   label   normal, bold, caps, italic, type (name and type), hidden (only on hover)
+ *   far     show the name when zoomed out
+ */
+const MAP_MARKERS = [
+  ['circle', 'Dot'], ['ring', 'Ring'], ['square', 'Square'], ['diamond', 'Diamond'], ['triangle', 'Triangle'], ['star', 'Star'],
+  ['icon:anchor', 'Anchor'], ['icon:castle', 'Castle'], ['icon:tower-control', 'Tower'], ['icon:church', 'Temple'],
+  ['icon:tent', 'Camp'], ['icon:home', 'House'], ['icon:store', 'Market'], ['icon:beer', 'Tavern'], ['icon:pickaxe', 'Mine'],
+  ['icon:swords', 'Battle'], ['icon:skull', 'Ruin'], ['icon:mountain', 'Peak'], ['icon:trees', 'Woods'], ['icon:landmark', 'Landmark'],
+  ['icon:sparkles', 'Wonder'], ['icon:map', 'Map'],
+];
+const MAP_SIZES = [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']];
+const MAP_LABELS = [['normal', 'Name'], ['bold', 'Name in bold'], ['caps', 'NAME IN CAPITALS'], ['italic', 'Name in italics'], ['type', 'Name and type'], ['hidden', 'No name (shown on hover)']];
+const MAP_MARKER_R = { small: 4.5, medium: 6, large: 8 };
+/* What a Type gets until it's chosen in the map key. */
+function defaultMapStyle(kind, type) {
+  const k = String(kind || '').toLowerCase();
+  const s = (marker, size, label, far) => ({ marker, size, label, far });
+  if (k === '@capital' || /\bcapital\b/.test(k)) return s('star', 'large', 'bold', true);
+  if (/\b(port|harbou?r|dock|haven|wharf)/.test(k)) return s('icon:anchor', 'medium', 'normal', true);
+  if (/\b(fort|fortress|castle|keep|citadel|stronghold|garrison|bastion)\b/.test(k)) return s('icon:castle', 'medium', 'normal', true);
+  if (/\b(temple|shrine|abbey|monastery|church|cathedral|chantry)\b/.test(k)) return s('icon:church', 'small', 'italic', false);
+  if (/\b(tavern|inn|alehouse)\b/.test(k)) return s('icon:beer', 'small', 'normal', false);
+  if (/\b(ruin|ruins|tomb|crypt|barrow)\b/.test(k)) return s('icon:skull', 'small', 'italic', false);
+  if (/\b(mine|quarry)\b/.test(k)) return s('icon:pickaxe', 'small', 'normal', false);
+  if (/\b(battlefield|battle)\b/.test(k)) return s('icon:swords', 'small', 'italic', false);
+  if (/\b(camp|encampment)\b/.test(k)) return s('icon:tent', 'small', 'normal', false);
+  if (/\b(city|metropolis)\b/.test(k)) return s('circle', 'large', 'bold', true);
+  if (/\b(town|borough)\b/.test(k)) return s('circle', 'medium', 'normal', true);
+  if (/\b(village|hamlet|outpost|settlement)\b/.test(k)) return s('circle', 'small', 'normal', false);
+  if (type === 'map') return s('square', 'medium', 'italic', true);
+  if (type === 'nation' || type === 'region') return s('diamond', 'large', 'caps', true);
+  if (type === 'settlement') return s('circle', 'medium', 'normal', true);
+  return s('circle', 'small', 'normal', false);
+}
+/* Draws a marker centred on 0,0 into an SVG group. */
+function drawMapMarker(g, style) {
+  const r = MAP_MARKER_R[style.size] || MAP_MARKER_R.medium;
+  const m = style.marker || 'circle';
+  if (m.startsWith('icon:')) {
+    const icon = GET_ICON ? GET_ICON(m.slice(5)) : null;
+    if (icon) {
+      const R = r + 3;
+      svgEl('circle', { r: R, class: 'ls-map-dot' }, g);
+      const s = R * 1.25;
+      icon.setAttribute('x', String(-s / 2)); icon.setAttribute('y', String(-s / 2));
+      icon.setAttribute('width', String(s)); icon.setAttribute('height', String(s));
+      icon.classList.add('ls-map-icon');
+      /* The theme sizes icons with CSS; on a map the icon has to fit its marker instead. */
+      icon.style.width = `${s}px`; icon.style.height = `${s}px`;
+      g.appendChild(icon);
+      return R;
+    }
+  }
+  if (m === 'square') { svgEl('rect', { x: -r, y: -r, width: 2 * r, height: 2 * r, rx: 1.5, class: 'ls-map-dot' }, g); return r; }
+  if (m === 'diamond') { const d = r * 1.3; svgEl('polygon', { points: `0,${-d} ${d},0 0,${d} ${-d},0`, class: 'ls-map-dot' }, g); return d; }
+  if (m === 'triangle') { const d = r * 1.35; svgEl('polygon', { points: `0,${-d} ${d * 0.95},${d * 0.7} ${-d * 0.95},${d * 0.7}`, class: 'ls-map-dot' }, g); return d; }
+  if (m === 'star') {
+    const R = r * 1.55, q = R * 0.45, pts = [];
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? q : R; pts.push(`${(Math.cos(a) * rr).toFixed(2)},${(Math.sin(a) * rr).toFixed(2)}`); }
+    svgEl('polygon', { points: pts.join(' '), class: 'ls-map-dot is-star' }, g);
+    return R;
+  }
+  svgEl('circle', { r, class: 'ls-map-dot' + (m === 'ring' ? ' is-ring' : '') }, g);
+  return r;
+}
+const mapYears = (y) => (y && String(y).trim() ? ` | ${oneLine(y).replace(/\|/g, '/')}` : '');
+function mapPinLine(p) { return `${p.target} | ${p.x.toFixed(5)}, ${p.y.toFixed(5)}${mapYears(p.years)}`; }
+function mapAreaLine(a) { return `${a.target} | ${a.pts.map((q) => `${q[0].toFixed(4)},${q[1].toFixed(4)}`).join(' ')}${a.color ? ` | ${a.color}` : ''}${mapYears(a.years)}`; }
+/* "900 – 1102", "from 1102", "until 1200", "1102" (from) -> { from, to } as written. */
+function rangeParts(t) {
+  t = String(t || '').trim();
+  let m;
+  if (!t) return { from: '', to: '' };
+  if ((m = t.match(/^(?:from|since)\s+(.+?)\s+(?:until|till|to)\s+(.+)$/i))) return { from: m[1].trim(), to: m[2].trim() };
+  if ((m = t.match(/^(?:from|since|after)\s+(.+)$/i))) return { from: m[1].trim(), to: '' };
+  if ((m = t.match(/^(?:until|till|to|before)\s+(.+)$/i))) return { from: '', to: m[1].trim() };
+  if ((m = t.match(/^(.*?\d[^–—]*?)\s*(?:[–—]|\s-\s|-(?=\d)|\bto\b)\s*(.*)$/i))) {
+    const end = m[2].trim();
+    return { from: m[1].trim(), to: /^(present|now|today)?$/i.test(end) ? '' : end };
+  }
+  return { from: t, to: '' };
+}
+function rangeText(r) { return r.from && r.to ? `${r.from} – ${r.to}` : r.from ? `from ${r.from}` : r.to ? `until ${r.to}` : ''; }
+const COLORS_ALL = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink'];
+function hashColor(s) { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) | 0; return COLORS_ALL[Math.abs(h) % COLORS_ALL.length]; }
+function polyCentroid(pts) {
+  let a = 0, x = 0, y = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length];
+    const c = x0 * y1 - x1 * y0;
+    a += c; x += (x0 + x1) * c; y += (y0 + y1) * c;
+  }
+  if (Math.abs(a) < 1e-12) return pts.reduce((m, q) => [m[0] + q[0] / pts.length, m[1] + q[1] / pts.length], [0, 0]);
+  return [x / (3 * a), y / (3 * a)];
+}
+
+/* "conquered" -> "is conquered"; "sank" -> "sank": how an ended_how word reads after a name. */
+function endedPhrase(how) {
+  const h = String(how || '').trim();
+  if (!h) return '';
+  const l = h.charAt(0).toLowerCase() + h.slice(1);
+  return /^\w+ed\b/i.test(h) ? `is ${l}` : l;
+}
+
 const COLORS = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'pink'];
 
 /* Relations web: kinds of line. Each relationship kind below maps onto one of these. */
@@ -58,6 +273,12 @@ const FIELD_EDGE = {
 const WEB_SKIP_FIELDS = new Set(['story', 'arcs']);
 /* Character fields that put someone in a group. Each can carry a role ("Student, Class of '24") in the character's roles list. */
 const ROLE_FIELDS = ['affiliation', 'house', 'leaderOf', 'education', 'workplace'];
+/* Places with rulers: a character leads one through Leader of (a king, a mayor, a keep's commander), with roles and years like a group. */
+const RULED = ['nation', 'settlement', 'location'];
+/* Anything a character can hold a position in. */
+const isGroupType = (t) => t === 'organization' || RULED.includes(t);
+/* The fields on a group or place that list its people. */
+const PEOPLE_FIELDS = ['members', 'leaders', 'founders', 'rulers'];
 const SECTION_OLD_NAMES = { 'Skills & Abilities': 'Powers & Abilities' };
 
 /* Character-to-character fields. The relationship engine reads these; everything else is a "connection". */
@@ -128,7 +349,7 @@ const INVERSE = {
   'character.culture': { label: 'People', one: 'Member' },
   'character.house': { label: 'Members', one: 'Member', merge: 'members' },
   'character.affiliation': { label: 'Members', one: 'Member', merge: 'members' },
-  'character.leaderOf': { label: 'Leaders', one: 'Leader', merge: 'leaders' },
+  'character.leaderOf': { label: 'Leaders', one: 'Leader', merge: ['leaders', 'rulers'] },
   'character.owns': { label: 'Owners', one: 'Owner', merge: 'owners' },
   'character.pioneered': { label: 'Pioneers', one: 'Pioneer', merge: 'pioneers' },
   'character.uses': { label: 'Used by', one: 'User' },
@@ -156,7 +377,7 @@ const INVERSE = {
   'plant.kept_by': { label: 'Plants', one: 'Grows' },
   'item.materials': { label: 'Made into', one: 'Made from this' },
   'location.partOf': { label: 'Places within', one: 'Within' },
-  'location.rulers': { label: 'Rules', one: 'Ruled' },
+  'location.rulers': { label: 'Rules', one: 'Ruled', merge: 'leaderOf' },
   'discovery.pioneers': { label: 'Pioneered', one: 'Pioneered', merge: 'pioneered' },
   'discovery.origin': { label: 'Discoveries from here', one: 'Discovered here' },
   'item.owners': { label: 'Owns', one: 'Owns', merge: 'owns' },
@@ -176,11 +397,12 @@ const INVERSE = {
   'language.regions': { label: 'Languages', one: 'Language', merge: 'languages' },
   'location.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
   'calendar.kept_by': { label: 'Calendars', one: 'Keeps', merge: 'calendars' },
+  'map.of': { label: 'Maps', one: 'Map' },
   'nation.partOf': { label: 'Vassals and provinces', one: 'Vassal' },
   'nation.territory': { label: 'Held by', one: 'Holds' },
   'nation.capital': { label: 'Capital of', one: 'Capital' },
   'nation.dynasty': { label: 'Rules', one: 'Ruling house' },
-  'nation.rulers': { label: 'Rules', one: 'Rules' },
+  'nation.rulers': { label: 'Rules', one: 'Rules', merge: 'leaderOf' },
   'nation.cultures': { label: 'Lands', one: 'Land', merge: 'regions' },
   'nation.species': { label: 'Nations', one: 'Nation' },
   'nation.faiths': { label: 'Faith of', one: 'Faith of' },
@@ -195,7 +417,7 @@ const INVERSE = {
   'region.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
   'settlement.nation': { label: 'Settlements', one: 'Settlement' },
   'settlement.partOf': { label: 'Settlements and districts', one: 'Within' },
-  'settlement.rulers': { label: 'Rules', one: 'Rules' },
+  'settlement.rulers': { label: 'Rules', one: 'Rules', merge: 'leaderOf' },
   'settlement.cultures': { label: 'Lands', one: 'Land', merge: 'regions' },
   'settlement.languages': { label: 'Spoken in', one: 'Region', merge: 'regions' },
   'character.nationality': { label: 'People', one: 'Citizen' },
@@ -214,8 +436,9 @@ const MIRROR = {
   'character.rivals': 'rivals', 'character.enemies': 'enemies',
   'character.mentors': 'students', 'character.students': 'mentors',
   'character.mother': 'children', 'character.father': 'children', 'character.children': '@parent',
-  'character.affiliation': 'members', 'character.house': 'members', 'character.leaderOf': 'leaders',
+  'character.affiliation': 'members', 'character.house': 'members', 'character.leaderOf': '@leads',
   'character.education': 'members', 'character.workplace': 'members',
+  'nation.rulers': 'leaderOf', 'settlement.rulers': 'leaderOf', 'location.rulers': 'leaderOf',
   'character.owns': 'owners', 'character.pioneered': 'pioneers',
   'character.creatures': 'bonded', 'creature.bonded': 'creatures',
   'organization.members': 'affiliation', 'organization.leaders': 'leaderOf',
@@ -355,7 +578,7 @@ const TYPES = {
       { group: 'Family', key: 'relatives', label: 'Other relatives', kind: 'links', types: ['character'] },
       { group: 'Family', key: 'house', label: 'House', kind: 'links', types: ['organization'] },
       { group: 'Ties', key: 'affiliation', label: 'Affiliation', kind: 'links', types: ['organization', 'culture'] },
-      { group: 'Ties', key: 'leaderOf', label: 'Leader of', kind: 'links', types: ['organization', 'culture'] },
+      { group: 'Ties', key: 'leaderOf', label: 'Leader of', kind: 'links', types: ['organization', 'culture', 'nation', 'settlement', 'location'], placeholder: 'A house, kingdom, town, keep' },
       { group: 'Ties', key: 'education', label: 'Education', kind: 'links', types: ['organization'] },
       { group: 'Ties', key: 'workplace', label: 'Workplace', kind: 'links', types: ['organization'] },
       { group: 'Ties', key: 'friends', label: 'Friends', kind: 'links', types: ['character'] },
@@ -377,6 +600,8 @@ const TYPES = {
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'School, company, team, gang, band, guild' },
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
       { key: 'founded', label: 'Founded', kind: 'text' },
+      { key: 'dissolved', label: 'Dissolved', kind: 'text', placeholder: 'When it ended, if it has' },
+      { key: 'ended_how', label: 'How it ended', kind: 'text', suggest: true, placeholder: 'Dissolved, merged, outlawed, disbanded' },
       { key: 'headquarters', label: 'Headquarters', kind: 'link', types: PLACES },
       { key: 'partOf', label: 'Part of', kind: 'link', types: ['organization'] },
       { key: 'founders', label: 'Founded by', kind: 'links', types: ['character', 'organization'] },
@@ -480,6 +705,7 @@ const TYPES = {
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Kingdom, empire, republic, city-state, clan lands' },
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
       { key: 'status', label: 'Status', kind: 'text', suggest: true, placeholder: 'Thriving, in decline, fallen, occupied' },
+      { key: 'color', label: 'Map color', kind: 'color' },
       { group: 'Rule', key: 'government', label: 'Government', kind: 'text', suggest: true, placeholder: 'Monarchy, theocracy, elected council' },
       { group: 'Rule', key: 'rulers', label: 'Ruled by', kind: 'links', types: ['character', 'organization'] },
       { group: 'Rule', key: 'dynasty', label: 'Ruling house', kind: 'links', types: ['organization'] },
@@ -498,6 +724,7 @@ const TYPES = {
       { group: 'Ties', key: 'currency', label: 'Currency', kind: 'text' },
       { group: 'History', key: 'founded', label: 'Founded', kind: 'text' },
       { group: 'History', key: 'dissolved', label: 'Fell', kind: 'text', placeholder: 'When it ended, if it has' },
+      { group: 'History', key: 'ended_how', label: 'How it fell', kind: 'text', suggest: true, placeholder: 'Conquered, collapsed, partitioned, absorbed' },
       { group: 'History', key: 'predecessor', label: 'Came after', kind: 'links', types: ['nation'] },
       { group: 'History', key: 'successor', label: 'Followed by', kind: 'links', types: ['nation'] },
     ],
@@ -515,6 +742,10 @@ const TYPES = {
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Continent, province, forest, mountains, sea, island' },
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
       { key: 'partOf', label: 'Part of', kind: 'link', types: ['region'] },
+      { key: 'color', label: 'Map color', kind: 'color' },
+      { key: 'founded', label: 'Formed', kind: 'text', placeholder: 'When it was named, settled or drawn up' },
+      { key: 'dissolved', label: 'Ended', kind: 'text', placeholder: 'If it was renamed, divided or lost' },
+      { key: 'ended_how', label: 'How it ended', kind: 'text', suggest: true, placeholder: 'Divided, flooded, swallowed by the sea' },
       { key: 'terrain', label: 'Terrain', kind: 'text', suggest: true, placeholder: 'Marsh, steppe, highlands' },
       { key: 'climate', label: 'Climate', kind: 'text', suggest: true, placeholder: 'Temperate, arid, frozen' },
       { key: 'population', label: 'Population', kind: 'text' },
@@ -541,6 +772,8 @@ const TYPES = {
       { key: 'cultures', label: 'Cultures', kind: 'links', types: ['culture'] },
       { key: 'languages', label: 'Languages', kind: 'links', types: ['language'] },
       { key: 'founded', label: 'Founded', kind: 'text' },
+      { key: 'dissolved', label: 'Ended', kind: 'text', placeholder: 'When it was abandoned, razed or lost, if it was' },
+      { key: 'ended_how', label: 'How it ended', kind: 'text', suggest: true, placeholder: 'Abandoned, destroyed, razed, conquered' },
       { key: 'status', label: 'Status', kind: 'text', suggest: true, placeholder: 'Thriving, abandoned, razed' },
     ],
   },
@@ -552,6 +785,9 @@ const TYPES = {
       { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'Tavern, temple, ruin, school, battlefield' },
       { key: 'aliases', label: 'Aliases', kind: 'list', placeholder: 'Comma separated' },
       { key: 'partOf', label: 'Part of', kind: 'link', types: PLACES },
+      { key: 'founded', label: 'Built', kind: 'text', placeholder: 'When it was built or founded' },
+      { key: 'dissolved', label: 'Ended', kind: 'text', placeholder: 'When it was destroyed or closed, if it was' },
+      { key: 'ended_how', label: 'How it ended', kind: 'text', suggest: true, placeholder: 'Destroyed, closed, burned, collapsed' },
       { key: 'rulers', label: 'Ruled by', kind: 'links', types: ['character', 'organization'] },
       { key: 'population', label: 'Population', kind: 'text' },
       { key: 'cultures', label: 'Cultures', kind: 'links', types: ['culture'] },
@@ -604,6 +840,15 @@ const TYPES = {
       { key: 'participants', label: 'Involved', kind: 'links', types: ['character', 'organization', 'culture', 'species', 'creature'] },
       { key: 'location', label: 'Where', kind: 'link', types: PLACES },
       { key: 'arcs', label: 'Plot arcs', kind: 'links', types: ['arc'] },
+    ],
+  },
+  map: {
+    label: 'Map', plural: 'Maps', folder: 'Maps', icon: 'map', color: 'green',
+    group: 'Places', thumb: true, sections: ['About'], details: [],
+    hints: { About: 'What the map shows, who drew it, and how far it can be trusted.' },
+    fields: [
+      { key: 'of', label: 'Map of', kind: 'link', types: PLACES },
+      { key: 'kind', label: 'Type', kind: 'text', suggest: true, placeholder: 'World, region, city, building, battle' },
     ],
   },
   holiday: {
@@ -684,7 +929,10 @@ const TYPES = {
 const RESERVED = new Set(['lore', 'type', 'tags', 'details', 'attributes', 'image', 'category', 'aliases', 'order', 'chapters', 'chapter_years']);
 for (const def of Object.values(TYPES)) for (const f of def.fields) RESERVED.add(f.key.toLowerCase());
 RESERVED.add('roles');
+RESERVED.add('ranks');
 RESERVED.add('ties');
+RESERVED.add('changes');
+for (const k of ['pins', 'areas', 'labels', 'places', 'aspect']) RESERVED.add(k);
 
 const NOTE_HINTS = {
   Want: 'What they think they need',
@@ -711,6 +959,7 @@ const DEFAULT_SETTINGS = {
   calendarView: { mode: 'year', show: {}, cal: '', compare: '' },
   manuscript: { legalName: '', byline: '', contact: '', font: 'Times New Roman', lang: 'en' },
   timeline: { births: true, foundings: true, calendar: true, cal: '' },
+  mapTime: { cal: null },
   web: {
     types: ['character', 'organization'],
     edges: {
@@ -730,6 +979,7 @@ const DEFAULT_SETTINGS = {
   typing: { outside: true, idleSeconds: 30, timeGoal: 0, pomodoro: 25, tab: 'today', kinds: ['scene', 'lore', 'other'], range: 7, metric: 'typed', heat: 'active', story: '' },
   customStructures: {},
   generatorFiles: {},
+  mapStyles: {},
 };
 
 /* ------------------------------------------------------------------ */
@@ -1472,6 +1722,7 @@ const ERA_FORMATS = [
   ['{y} {short}', '1128 AD · -395 TE · 201 4E'],
   ['{short} {y}', 'AD 1128 · 4E 201'],
   ['{n}:{y} {short}', '9:41 Dragon'],
+  ['{n}:{yy} {short}', '9:05 Dragon (two-digit years)'],
   ['{y} {name}', '41 Dragon Age'],
   ['Year {y} of the {name}', 'Year 41 of the Dragon Age'],
   ['{y} {ord} {word}', '41 9th Age'],
@@ -1552,6 +1803,17 @@ class Eras {
     this.en = en;
     const sm = L.map((e) => eraFirst(e.short).match(/^(\d+)\s*(\D+)$/)).find(Boolean);
     this.suffix = sm ? sm[2] : '';
+    /* The last era listed has a length: when it ends, another of the same length begins (unless era_repeat says
+       otherwise), and the eras that follow count their years the way it does (from 0, from 1…). */
+    const last = n - 1;
+    this.tmpl = L[last];
+    this.implied = false;
+    if (!this.repeat && L[last].len && Number.isFinite(en[last]) && st[last] != null) { this.repeat = L[last].len; this.implied = true; }
+  }
+  /* The numbering of eras after the listed ones: like the last listed era, counting up. */
+  synthEra(i) {
+    const t = this.tmpl || {};
+    return { name: '', short: this.suffix ? `${this.numOf(i)}${this.suffix}` : '', len: this.repeat, mode: 'up', num: t.mode === 'up' ? t.num : 1, fmt: t.fmt || '' };
   }
   /* The era's number, used by {n}: the anchor is 1, the one before it 0. */
   numOf(i) { return i - (this.anchor >= 0 ? this.anchor : this.list.length) + 1; }
@@ -1576,7 +1838,7 @@ class Eras {
   }
   info(i, y) { return this.make(i, this.list[i], this.st[i], this.en[i], y); }
   make(i, e, start, end, y) {
-    const era = e || { name: '', short: this.suffix ? `${this.numOf(i)}${this.suffix}` : '', len: this.repeat, mode: 'up', num: 1, fmt: '' };
+    const era = e || this.synthEra(i);
     let num;
     if (era.mode === 'up') { num = era.num + (y - start); if (!this.zero && era.num >= 1 && num <= 0) num -= 1; }
     else if (era.mode === 'upTo') { num = era.num - (end - y); if (!this.zero && era.num <= -1 && num >= 0) num += 1; }
@@ -1591,7 +1853,9 @@ class Eras {
       const hi = L.map((_, k) => k).filter((k) => this.st[k] != null).pop();
       if (!this.repeat || !Number.isFinite(this.en[hi]) || i < L.length) return null;
       start = this.en[hi] + 1 + (i - L.length) * this.repeat;
-      return start + num - 1;
+      const t = this.synthEra(i);
+      if (num < t.num || num > t.num + this.repeat - 1) return null;
+      return start + (num - t.num);
     }
     if (start == null) return null;
     if (e.mode === 'up') { if (!this.zero && e.num >= 1 && num < 0) num += 1; return start + (num - e.num); }
@@ -1610,7 +1874,7 @@ class Eras {
     const usesNum = /\{(n|ord|roman)\}/.test(fmt);
     const unnamed = (v) => v || (usesNum ? '' : `${ordinal(a.n)} ${this.word}`);
     const t = fmt.replace(/\{(\w+)\}/g, (m, k) => ({
-      y: a.num, n: a.n, ord: ordinal(a.n), roman: roman(a.n), word: this.word,
+      y: a.num, yy: a.num < 0 ? `-${String(-a.num).padStart(2, '0')}` : String(a.num).padStart(2, '0'), n: a.n, ord: ordinal(a.n), roman: roman(a.n), word: this.word,
       name: unnamed(eraFirst(e.name) || eraFirst(e.short)), short: unnamed(eraFirst(e.short) || eraFirst(e.name)), abbr: unnamed(eraFirst(e.short) || eraFirst(e.name)),
     }[k] ?? m));
     return t.replace(/\s+/g, ' ').replace(/\s+([,.:;)])/g, '$1').replace(/\(\s*\)/g, '').replace(/[\s,]+$/, '').trim();
@@ -1631,12 +1895,12 @@ class Eras {
         }
         const v = toks[t[1]];
         if (v === undefined || v === null) { ok = false; return ''; }
-        if (t[1] !== 'y') marker = true;
+        if (t[1] !== 'y' && t[1] !== 'yy') marker = true;
         const caps = (v.match(/\((?!\?)/g) || []).length;
         for (let c = 0; c < caps; c++) keys.push(t[1]);
         return v;
       }).join('');
-      if (!ok || !marker || !keys.includes('y')) return null;
+      if (!ok || !marker || !(keys.includes('y') || keys.includes('yy'))) return null;
       return { re: new RegExp('(?:^|[^\\p{L}\\d-])' + body + '(?![\\p{L}\\d])', 'iu'), i: idx, keys };
     };
     const Y = '(-?\\d+)';
@@ -1644,7 +1908,7 @@ class Eras {
       if (this.st[i] == null) return;
       const n = this.numOf(i);
       const toks = {
-        y: Y, n: String(n), ord: reEsc(ordinal(n)), roman: n >= 1 ? roman(n) : null, word: reEsc(this.word),
+        y: Y, yy: Y, n: String(n), ord: reEsc(ordinal(n)), roman: n >= 1 ? roman(n) : null, word: reEsc(this.word),
         name: alt(e.name || e.short), short: alt(e.short || e.name), abbr: alt(e.short || e.name),
       };
       for (const f of [this.fmtOf(e), '{y} {short}', '{short} {y}', '{y} {name}', '{name} {y}', 'Year {y} of the {name}', '{n}:{y}', '{y} {ord} {word}']) {
@@ -1654,8 +1918,8 @@ class Eras {
     });
     if (this.repeat) {
       const N = '(\\d+)';
-      const toks = { y: Y, n: N, ord: `${N}(?:st|nd|rd|th)`, roman: null, word: reEsc(this.word), name: null, short: this.suffix ? `${N}${reEsc(this.suffix)}` : null, abbr: null };
-      for (const f of [this.fmt || '{n}:{y}', '{n}:{y}', '{short} {y}', '{y} {short}', '{y} {ord} {word}', 'Year {y} of the {ord} {word}']) {
+      const toks = { y: Y, yy: Y, n: N, ord: `${N}(?:st|nd|rd|th)`, roman: null, word: reEsc(this.word), name: null, short: this.suffix ? `${N}${reEsc(this.suffix)}` : null, abbr: null };
+      for (const f of [(this.tmpl && this.tmpl.fmt) || this.fmt || '{n}:{y}', this.fmt || '{n}:{y}', '{n}:{y}', '{short} {y}', '{y} {short}', '{y} {ord} {word}', 'Year {y} of the {ord} {word}']) {
         const r = build(f, toks, -1);
         if (r) out.push(r);
       }
@@ -1671,7 +1935,7 @@ class Eras {
       const m = s.match(r.re);
       if (!m) continue;
       let i = r.i, num = null, n = null;
-      r.keys.forEach((k, j) => { const v = m[j + 1]; if (v == null) return; if (k === 'y') num = Number(v); else n = Number(v); });
+      r.keys.forEach((k, j) => { const v = m[j + 1]; if (v == null) return; if (k === 'y' || k === 'yy') num = Number(v); else n = Number(v); });
       if (num == null) continue;
       if (i < 0) { if (n == null) continue; i = this.list.length + n - this.numOf(this.list.length); }
       const y = this.yearOf(i, num);
@@ -3063,6 +3327,7 @@ class LoresmithPlugin extends Plugin {
     this.registerView(VIEW_WEB, (leaf) => new WebView(leaf, this));
     this.registerView(VIEW_OUTLINE, (leaf) => new OutlineView(leaf, this));
     this.registerView(VIEW_PANEL, (leaf) => new PanelView(leaf, this));
+    this.registerView(VIEW_MAP, (leaf) => new MapView(leaf, this));
 
     this.addRibbonIcon('library', 'Open lore overview', () => this.openOverview());
     this.addRibbonIcon('book-marked', 'Open lore sidebar', () => this.openPanel());
@@ -3139,7 +3404,7 @@ class LoresmithPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('delete', dropCal));
     this.registerEvent(this.app.metadataCache.on('changed', dropWords));
     this.registerEvent(this.app.vault.on('rename', dropWords));
-    this.registerEvent(this.app.vault.on('rename', (f, oldPath) => { window.setTimeout(() => this.fixRoleLinks(f, oldPath), 1500); }));
+    this.registerEvent(this.app.vault.on('rename', (f, oldPath) => { window.setTimeout(() => { this.fixRoleLinks(f, oldPath); this.fixMapLinks(f, oldPath); }, 1500); }));
     this.registerEvent(this.app.vault.on('delete', dropWords));
     if (CM_VIEW && CM_VIEW.hoverTooltip) {
       this.registerEditorExtension(CM_VIEW.hoverTooltip((view, pos) => this.wordTooltip(view, pos), { hoverTime: 350 }));
@@ -3151,6 +3416,18 @@ class LoresmithPlugin extends Plugin {
     for (const [k, g] of Object.entries(GENERATORS)) {
       this.addCommand({ id: `generate-${k}`, name: `Generate: ${g.label.toLowerCase()}`, callback: () => this.openOverview(`gen:${k}`) });
     }
+    this.addCommand({ id: 'open-map', name: 'Open a map', callback: () => { const ms = this.index().map; if (!ms.length) this.promptCreate('map'); else if (ms.length === 1) this.openMap(ms[0]); else new FileSuggest(this.app, ms, 'Which map?', (m) => this.openMap(m)).open(); } });
+    this.addCommand({ id: 'new-map', name: 'Create map', callback: () => this.promptCreate('map') });
+    this.addCommand({
+      id: 'place-on-map', name: 'Place the current entry on a map',
+      checkCallback: (checking) => {
+        const f = this.app.workspace.getActiveFile();
+        const t = f && this.typeOf(f);
+        if (!t || !TYPES[t] || t === 'map' || TYPES[t].plain) return false;
+        if (!checking) this.placeOnMap(f, PLACES.includes(t) && t !== 'location' ? 'area' : 'pin');
+        return true;
+      },
+    });
     this.addCommand({ id: 'open-calendar', name: 'Open calendar', callback: () => this.openOverview('calendar') });
     this.addCommand({ id: 'open-calendar-note', name: 'Open calendar note (months, holidays, history)', callback: () => new ItemSuggest(this.app, this.calendars(), (c) => c.name, 'Which calendar?', (c) => this.openCalendarNote(c)).open() });
     this.addCommand({ id: 'edit-calendar', name: 'Edit a calendar', callback: () => { const cs = this.calendars(); if (cs.length === 1) this.editCalendar(cs[0]); else new ItemSuggest(this.app, cs, (c) => c.name, 'Which calendar?', (c) => this.editCalendar(c)).open(); } });
@@ -3208,6 +3485,7 @@ class LoresmithPlugin extends Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
     this.settings.layouts = Object.assign({}, data.layouts);
     this.settings.timeline = Object.assign({}, DEFAULT_SETTINGS.timeline, data.timeline);
+    this.settings.mapTime = Object.assign({}, DEFAULT_SETTINGS.mapTime, data.mapTime);
     const web = data.web || {};
     this.settings.web = Object.assign({}, DEFAULT_SETTINGS.web, web);
     this.settings.web.edges = Object.assign({}, DEFAULT_SETTINGS.web.edges, web.edges);
@@ -3227,6 +3505,7 @@ class LoresmithPlugin extends Plugin {
     this.settings.foldedGroups = Object.assign({}, data.foldedGroups);
     this.settings.meet = Object.assign({}, DEFAULT_SETTINGS.meet, data.meet);
     this.settings.peopleView = Object.assign({}, data.peopleView);
+    this.settings.mapStyles = Object.assign({}, data.mapStyles);
     /* 0.7: "family" used to include other relatives; siblings now have their own line. */
     if (web.edges && !('sibling' in web.edges)) this.settings.web.edges.sibling = this.settings.web.edges.family !== false;
   }
@@ -4172,7 +4451,7 @@ class LoresmithPlugin extends Plugin {
     this._graph = { proj, idx, types, out, inn, parents, children, implied };
     return this._graph;
   }
-  dropGraph() { this._graph = null; this._meet = null; }
+  dropGraph() { this._graph = null; this._meet = null; this._areaColors = null; }
 
   /* 0 = she, 1 = he, 2 = unknown. Read from pronouns, gender, or being someone's mother or father. */
   genderOf(f) {
@@ -4319,6 +4598,181 @@ class LoresmithPlugin extends Plugin {
   }
   async setRole(ch, org, title) { return this.setRoles(ch, org, title ? [{ title }] : []); }
   /* Roles are written as "[[Group]]: role". If a group is renamed and the link inside that text was not updated, fix it. */
+  /* ---------- maps ---------- */
+
+  /* What is drawn on a map: { image (file), aspect, pins, areas, labels }, all in fractions of the image. */
+  mapData(map) {
+    const fm = this.fm(map);
+    const img = this.resolveLink(fm.image, map);
+    return {
+      image: img && IMAGE_EXT.includes(img.extension.toLowerCase()) ? img : null,
+      aspect: Number(fm.aspect) > 0 ? Number(fm.aspect) : 1.5,
+      pins: toArr(fm.pins).map(parseMapPin).filter(Boolean),
+      areas: toArr(fm.areas).map(parseMapArea).filter(Boolean),
+      labels: toArr(fm.labels).map(parseMapPin).filter(Boolean),
+    };
+  }
+  /* The nation a place belongs to: a settlement's Nation, or whatever its Part of / In chain reaches. */
+  nationOf(f, seen = new Set()) {
+    if (!f || seen.has(f) || seen.size > 8) return null;
+    seen.add(f);
+    const t = this.typeOf(f);
+    if (t === 'nation') return f;
+    if (!PLACES.includes(t)) return null;
+    const fm = this.fm(f);
+    if (t === 'settlement') {
+      const n = this.resolveLink(toArr(fm.nation)[0], f);
+      if (n && this.typeOf(n) === 'nation') return n;
+    }
+    const up = this.resolveLink(toArr(fm.partOf)[0], f);
+    return up && this.typeOf(up) !== 'region' ? this.nationOf(up, seen) : null;
+  }
+  /* The color a nation or region is drawn in: its own Map color, then a color its area was given on a map, then one
+     picked from its name, so its areas, its settlements and its key always match. */
+  entityColor(f, areas, mapFile) {
+    const c = String(this.fm(f).color || '').trim();
+    if (isMapColor(c)) return c;
+    if (areas) {
+      const a = areas.find((x) => x.color && this.resolveLink(x.target, mapFile) === f);
+      if (a) return a.color;
+    }
+    /* Colors given on other maps, worked out once until a note changes. */
+    if (!this._areaColors) {
+      this._areaColors = new Map();
+      for (const m of this.index().map) {
+        for (const x of this.mapData(m).areas) {
+          if (!x.color) continue;
+          const d = this.resolveLink(x.target, m);
+          if (d && !this._areaColors.has(d.path)) this._areaColors.set(d.path, x.color);
+        }
+      }
+    }
+    return this._areaColors.get(f.path) || hashColor(f.basename);
+  }
+  /* The color a pin or area for this entry gets on a map. A nation's, or a place inside one, is the nation's color. */
+  mapColorOf(f, item, areas, mapFile) {
+    const type = this.typeOf(f);
+    if (type === 'nation') return this.entityColor(f, areas, mapFile);
+    if (type === 'region') return isMapColor(String(this.fm(f).color || '')) ? String(this.fm(f).color) : item.color || hashColor(f.basename);
+    if (type === 'settlement' || type === 'location') {
+      const n = this.nationOf(f);
+      if (n) return this.entityColor(n, areas, mapFile);
+    }
+    return item.color || (item.pts ? hashColor(f.basename) : (TYPES[type] ? TYPES[type].color : 'base'));
+  }
+  /* A capital: its Type says so ("Capital City"), or a nation names it as its Capital. */
+  isCapital(f) {
+    if (/\bcapital\b/i.test(String(this.fm(f).kind || ''))) return true;
+    return (this.graph().inn.get(f) || []).some((e) => e.field === 'capital' && e.srcType === 'nation');
+  }
+  /* Which map key line an entry is drawn by: its Type ("port town"), the capital line, or its kind of entry. */
+  mapStyleKey(f) {
+    const type = this.typeOf(f);
+    const kind = String(toArr(this.fm(f).kind)[0] || '').trim().toLowerCase();
+    if (kind && /\bcapital\b/.test(kind)) return kind;
+    if (type === 'settlement' && this.isCapital(f)) return '@capital';
+    return kind || `@type:${type || 'other'}`;
+  }
+  mapStyle(key, type) {
+    const own = this.settings.mapStyles[key];
+    const base = defaultMapStyle(key.startsWith('@type:') ? '' : key, key.startsWith('@type:') ? key.slice(6) : type);
+    return Object.assign(base, own || {}, { key, custom: !!own });
+  }
+  mapStyleLabel(key) {
+    if (key === '@capital') return 'Capitals (named on a nation)';
+    if (key.startsWith('@type:')) { const t = TYPES[key.slice(6)]; return t ? `${t.plural} with no type` : 'Other pins'; }
+    return key.replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+  }
+  async setMapStyle(key, style) {
+    if (style) this.settings.mapStyles[key] = { marker: style.marker, size: style.size, label: style.label, far: !!style.far };
+    else delete this.settings.mapStyles[key];
+    await this.saveSettings();
+    for (const l of this.app.workspace.getLeavesOfType(VIEW_MAP)) if (l.view && l.view.drawFeatures) { l.view.drawFeatures(); l.view.renderCard(); }
+  }
+
+  async saveMap(map, d) {
+    const links = new Set();
+    for (const x of [...d.pins, ...d.areas]) if (/^\[\[/.test(x.target)) links.add(x.target);
+    await this.app.fileManager.processFrontMatter(map, (fm) => {
+      const set = (k, v) => { if (v && (!Array.isArray(v) || v.length)) fm[k] = v; else delete fm[k]; };
+      set('pins', d.pins.map(mapPinLine));
+      set('areas', d.areas.map(mapAreaLine));
+      set('labels', d.labels.map((l) => mapPinLine(l)));
+      set('places', [...links]);
+      if (d.aspect) fm.aspect = Math.round(d.aspect * 10000) / 10000;
+    });
+    this.dropGraph();
+  }
+  /* The last day of a point: the day itself, or the last day of its year. */
+  gEnd(pt) {
+    if (!pt) return null;
+    if (pt.d != null) return this.gOf(pt);
+    const c = pt.cal || this.primaryCal();
+    return c.epoch + c.daysBefore(pt.y) + c.year(pt.y).yearDays - 1;
+  }
+  /* The days a map shape is shown, from its years: { a, b, bad } (a or b null: open-ended). */
+  mapRange(years, map) {
+    const r = rangeParts(years);
+    const pa = r.from ? this.toPt(r.from, map) : null;
+    const pb = r.to ? this.toPt(r.to, map) : null;
+    return { a: pa ? this.gOf(pa) : null, b: pb ? this.gEnd(pb) : null, bad: (!!r.from && !pa) || (!!r.to && !pb) };
+  }
+  /* Every map an entry is on: [{ map, kind: 'pin' | 'area', item, data }]. Of a place's dated shapes on one map,
+     the one shown at the present day (or the latest). */
+  mapsWith(f) {
+    const out = [];
+    const now = this.latestPresent();
+    const g = now ? this.gOf(now) : null;
+    const best = (list, m) => {
+      if (list.length < 2) return list[0];
+      const live = list.find((x) => { const r = this.mapRange(x.years, m); return g == null || ((r.a == null || g >= r.a) && (r.b == null || g <= r.b)); });
+      return live || list[list.length - 1];
+    };
+    for (const m of this.index().map) {
+      if (m === f) continue;
+      const d = this.mapData(m);
+      const pin = best(d.pins.filter((x) => this.resolveLink(x.target, m) === f), m);
+      const area = best(d.areas.filter((x) => this.resolveLink(x.target, m) === f), m);
+      if (pin) out.push({ map: m, kind: 'pin', item: pin, data: d });
+      if (area) out.push({ map: m, kind: 'area', item: area, data: d });
+    }
+    return out;
+  }
+  async openMap(map, opts = {}) {
+    const ws = this.app.workspace;
+    let leaf = ws.getLeavesOfType(VIEW_MAP).find((l) => l.view && l.view.file === map);
+    if (!leaf) leaf = ws.getLeaf(this.settings.openInNewTab ? 'tab' : false);
+    await leaf.setViewState({ type: VIEW_MAP, state: Object.assign({ file: map.path }, opts), active: true });
+    await ws.revealLeaf(leaf);
+  }
+  /* "Place on a map": choose a map, then tap (pin) or draw (area) for this entry. */
+  placeOnMap(f, how) {
+    const maps = this.index().map;
+    const go = (m) => this.openMap(m, how === 'area' ? { draw: f.path } : { place: f.path });
+    if (!maps.length) { new Notice('Create a map first (Maps, under Places).'); return; }
+    if (maps.length === 1) go(maps[0]);
+    else new FileSuggest(this.app, maps, 'Which map?', go).open();
+  }
+  /* Map strings keep links as text: after a rename, point any stale ones at the renamed note. */
+  async fixMapLinks(f, oldPath) {
+    if (!(f instanceof TFile)) return;
+    const oldName = String(oldPath).split('/').pop().replace(/\.md$/, '');
+    const oldNoExt = String(oldPath).replace(/\.md$/, '');
+    if (oldName === f.basename && oldNoExt === f.path.replace(/\.md$/, '')) return;
+    for (const m of this.index().map) {
+      const fm = this.fm(m);
+      const stale = (v) => { const t = linkText(v); return (t === oldName || t === oldNoExt) && !this.resolveLink(v, m); };
+      const keys = ['pins', 'areas', 'places'];
+      if (!keys.some((k) => toArr(fm[k]).some((line) => /^\s*\[\[/.test(line) && stale(String(line).match(/^\s*(\[\[[^\]]*\]\])/)[1])))) continue;
+      await this.app.fileManager.processFrontMatter(m, (x) => {
+        for (const k of keys) {
+          if (!x[k]) continue;
+          x[k] = toArr(x[k]).map((line) => String(line).replace(/^(\s*)(\[\[[^\]]*\]\])/, (all, sp, l) => (stale(l) ? sp + this.linkTo(f, m) : all)));
+        }
+      });
+    }
+  }
+
   async fixRoleLinks(f, oldPath) {
     if (!(f instanceof TFile) || f.extension !== 'md') return;
     const oldName = String(oldPath).split('/').pop().replace(/\.md$/, '');
@@ -4353,7 +4807,7 @@ class LoresmithPlugin extends Plugin {
   inGroup(ch, grp) {
     const g = this.graph();
     return (g.out.get(ch) || []).some((e) => e.dest === grp && ROLE_FIELDS.includes(e.field))
-      || (g.out.get(grp) || []).some((e) => e.dest === ch && (e.field === 'members' || e.field === 'leaders'));
+      || (g.out.get(grp) || []).some((e) => e.dest === ch && ['members', 'leaders', 'rulers'].includes(e.field));
   }
   /* Puts a character in exactly these subdivisions of a group: joins new ones through Affiliation, leaves the rest. */
   async setSubdivisions(ch, org, chosen) {
@@ -4376,7 +4830,7 @@ class LoresmithPlugin extends Plugin {
       }
     });
     await strip(ch, ROLE_FIELDS, grp);
-    await strip(grp, ['members', 'leaders'], ch);
+    await strip(grp, ['members', 'leaders', 'rulers'], ch);
   }
 
   /* Groups that are Part of this one: houses of a school, departments of a company, squads of an army. */
@@ -4390,10 +4844,62 @@ class LoresmithPlugin extends Plugin {
     const kinds = new Set(this.subdivisionsOf(org).map((s) => String(this.fm(s).kind || '').trim().toLowerCase()).filter(Boolean));
     return kinds.size === 1 ? [...kinds][0] : 'subgroup';
   }
+  /* ---------- ranks ---------- */
+
+  /* An organization's ranks, highest first, from its `ranks` list, or the nearest group above it (through Part of)
+     that has some: { list: ['Grand Master', 'Knight', 'Squire'], from: the group they belong to, or null }. */
+  ranksOf(org, seen = new Set()) {
+    if (!org || seen.has(org) || seen.size > 8) return { list: [], from: null };
+    seen.add(org);
+    /* Just saved and not yet re-read by Obsidian: use what was written, not the old cache. */
+    const pend = this._pendingRanks && this._pendingRanks.get(org.path);
+    const own = pend || toArr(this.fm(org).ranks).map((x) => String(x).trim()).filter(Boolean);
+    if (own.length) return { list: own, from: org };
+    const up = this.resolveLink(toArr(this.fm(org).partOf)[0], org);
+    return up && this.typeOf(up) === 'organization' ? this.ranksOf(up, seen) : { list: [], from: null };
+  }
+  /* Where a title sits among a group's ranks: 0 for the highest, -1 when it isn't one of them. The rank is the part of
+     the title before a comma ("Captain, 3rd Company" is a Captain); a rank can list other spellings ("Captain/Capt."). */
+  rankIndex(org, title, ranks) {
+    const list = ranks || this.ranksOf(org).list;
+    if (!list.length || !title) return -1;
+    const head = String(title).split(',')[0].trim().replace(/^(former\s+|ex-|future\s+)/i, '').toLowerCase();
+    if (!head) return -1;
+    return list.findIndex((r) => String(r).split('/').some((x) => x.trim().toLowerCase() === head));
+  }
+  /* The highest rank someone holds (or held) in a group, or -1. */
+  personRank(org, r, ranks) {
+    const list = ranks || this.ranksOf(org).list;
+    if (!list.length) return -1;
+    const titles = [r.head, ...(r.entries || []).map((e) => e.title), ...(r.subs || []).map((x) => x.title)];
+    const ix = titles.map((t) => this.rankIndex(org, t, list)).filter((i) => i >= 0);
+    return ix.length ? Math.min(...ix) : -1;
+  }
+  /* Changes a group's own ranks. `change` gets the latest list (including any change still being saved) and returns the
+     new one, so quick edits in a row build on each other instead of on what the page showed before. Saves run one at
+     a time, and until Obsidian has re-read the note the new list is what everything sees. */
+  setRanks(org, change) {
+    this._pendingRanks = this._pendingRanks || new Map();
+    this._rankChain = (this._rankChain || Promise.resolve()).then(async () => {
+      const cur = this._pendingRanks.get(org.path) || toArr(this.fm(org).ranks).map((x) => String(x).trim()).filter(Boolean);
+      const next = typeof change === 'function' ? change(cur.slice()) : change;
+      const clean = [];
+      for (const x of toArr(next)) { const t = oneLine(x).trim(); if (t && !clean.some((c) => c.toLowerCase() === t.toLowerCase())) clean.push(t); }
+      this._pendingRanks.set(org.path, clean);
+      const indexed = this.nextMetaChange(org.path);
+      await this.app.fileManager.processFrontMatter(org, (fm) => { if (clean.length) fm.ranks = clean; else delete fm.ranks; });
+      await indexed;
+      if (this._pendingRanks.get(org.path) === clean) this._pendingRanks.delete(org.path);
+      this.dropGraph();
+    }).catch((e) => { this._pendingRanks.delete(org.path); console.error('Loresmith: could not save ranks', e); new Notice('Could not save the ranks.'); });
+    return this._rankChain;
+  }
+
   /* Everyone in a group, from their sheets, the group's page, and its subdivisions:
      [{ file, entries, how, leader, founder, subs: [{ org, status, title }], status, entry, head }] */
   peopleOf(org, depth = 0) {
     const g = this.graph();
+    const ruled = RULED.includes(g.types.get(org));
     const map = new Map();
     const get = (c) => {
       let r = map.get(c);
@@ -4411,6 +4917,7 @@ class LoresmithPlugin extends Plugin {
       const r = get(e.dest);
       if (e.field === 'members') { r.direct = true; r.how.add('Member'); }
       else if (e.field === 'leaders') { r.direct = true; r.how.add('Leader'); r.leader = true; }
+      else if (e.field === 'rulers') { r.direct = true; r.how.add('Ruler'); r.leader = true; }
       else if (e.field === 'founders') { r.how.add('Founder'); r.founder = true; }
     }
     /* People listed only under a role (no link field) still count. */
@@ -4441,7 +4948,7 @@ class LoresmithPlugin extends Plugin {
       }
       r.entry = act.length ? act[act.length - 1] : r.entries[r.entries.length - 1] || null;
       const t = r.entry && r.entry.title ? r.entry.title.split(',')[0].trim() : '';
-      r.head = t || (r.leader ? 'Leader' : r.founder ? 'Founder' : 'Member');
+      r.head = t || (r.leader ? (ruled ? 'Ruler' : 'Leader') : r.founder ? 'Founder' : 'Member');
     }
     return [...map.values()];
   }
@@ -4449,8 +4956,141 @@ class LoresmithPlugin extends Plugin {
   /* Every name an entry goes by, for search. */
   namesOf(f) {
     const fm = this.fm(f);
-    return [f.basename, ...toArr(fm.aliases), fm.birth_name, fm.full_name].filter(Boolean).map((x) => String(x));
+    const old = FOUNDING[this.typeOf(f)] ? this.historyOf(f).filter((c) => c.k.act === 'name').flatMap((c) => [c.from, c.target]) : [];
+    return [f.basename, ...toArr(fm.aliases), fm.birth_name, fm.full_name, ...old].filter(Boolean).map((x) => String(x));
   }
+
+  /* ---------- history of places and groups: names, holders, destruction ---------- */
+
+  /* The `changes` lines of an entry, read and in date order (undated last): [{ kind, k, when, from, target, note, pt, g, tf, ff }]. */
+  historyOf(f) {
+    const out = toArr(this.fm(f).changes).map(parseChange).filter(Boolean).map((c, i) => {
+      const pt = c.when ? this.toPt(c.when, f) : null;
+      const link = (v) => (/\[\[/.test(v) ? this.resolveLink(v, f) : null);
+      return Object.assign(c, { i, pt, g: pt ? this.gOf(pt) : null, tf: link(c.target), ff: link(c.from) });
+    });
+    return out.sort((a, b) => (a.g == null) - (b.g == null) || (a.g || 0) - (b.g || 0) || a.i - b.i);
+  }
+  /* A holder written as a link or plain text: { file, text } or null. */
+  holderOf(v, f) {
+    if (!v) return null;
+    const file = /\[\[/.test(v) ? this.resolveLink(v, f) : null;
+    return { file, text: file ? file.basename : linkText(v) };
+  }
+  /* Who held it over time: [{ holder, from (point), to (point), status: past | now | later }]. */
+  ownershipOf(f) {
+    const type = this.typeOf(f);
+    const fm = this.fm(f);
+    const field = HOLDER_FIELD[type];
+    const now = this.latestPresent();
+    const gNow = now ? this.gOf(now) : null;
+    const hands = this.historyOf(f).filter((c) => c.k.act === 'hands' || c.k.act === 'free');
+    const segs = [];
+    let cur = null;
+    let since = this.toPt(fm.founded, f);
+    if (hands.length) {
+      const first = hands[0];
+      cur = this.holderOf(first.from, f);
+      if (!cur && field) {
+        /* The field still names someone no change hands it to: they held it before the first change. */
+        const fv = toArr(fm[field])[0];
+        const fh = this.holderOf(fv, f);
+        if (fh && !hands.some((c) => this.holderOf(c.target, f) && this.holderOf(c.target, f).text === fh.text)) cur = fh;
+      }
+      for (const c of hands) {
+        if (cur) segs.push({ holder: cur, from: since, to: c.pt, change: c });
+        cur = c.k.act === 'free' ? null : this.holderOf(c.target, f);
+        since = c.pt;
+      }
+    } else if (field) cur = this.holderOf(toArr(fm[field])[0], f);
+    const end = this.endOf(f);
+    if (cur) segs.push({ holder: cur, from: since, to: end ? end.pt : null });
+    for (const sg of segs) {
+      const a = sg.from ? this.gOf(sg.from) : null, b = sg.to ? this.gOf(sg.to) : null;
+      sg.status = gNow == null ? (sg.to ? 'past' : 'now') : b != null && b <= gNow ? 'past' : a != null && a > gNow ? 'later' : 'now';
+    }
+    return segs;
+  }
+  /* What it was called on day g of the shared count (the note's name when nothing says otherwise). */
+  nameAt(f, g) {
+    const rn = this.historyOf(f).filter((c) => c.k.act === 'name' && c.target);
+    if (!rn.length) return f.basename;
+    let name = rn[0].from || (rn.some((c) => linkText(c.target) === f.basename) ? '' : f.basename);
+    for (const c of rn) if (g == null || (c.g != null && c.g <= g)) name = linkText(c.target);
+    return name || f.basename;
+  }
+  /* When it stopped standing, as of the present: the Ended date, or the last destruction not undone since.
+     { pt, how } or null. */
+  endOf(f) {
+    const fm = this.fm(f);
+    const d = this.toPt(fm.dissolved, f);
+    if (d) return { pt: d, how: String(fm.ended_how || '').trim() };
+    const now = this.latestPresent();
+    const gNow = now ? this.gOf(now) : null;
+    let last = null;
+    for (const c of this.historyOf(f)) {
+      if (c.g == null || (gNow != null && c.g > gNow)) continue;
+      if (c.k.act === 'end') last = c;
+      else if (c.k.act === 'back') last = null;
+    }
+    return last ? { pt: last.pt, how: last.k.label, change: last } : null;
+  }
+  /* One change as a sentence: "Port Aldis is renamed Kingsport", "Kingsport is conquered by Tevinter". */
+  changeText(f, c) {
+    if (c.k === CHANGE_OTHER) return c.note;
+    const before = c.k.act === 'name' ? (c.from || this.nameAt(f, c.g != null ? c.g - 1 : null)) : this.nameAt(f, c.g);
+    const who = c.target ? (c.tf ? c.tf.basename : linkText(c.target)) : '';
+    if (c.k.act === 'name') return `${before} ${c.k.past} ${who}`.trim();
+    if (c.k.act === 'hands') return `${before} ${c.k.past} ${who || 'someone else'}`;
+    return `${before} ${c.k.past}${who ? ` by ${who}` : ''}`;
+  }
+  /* Places and groups this entry held at some point, through their histories: [{ file, segs }]. */
+  holdingsOf(holder) {
+    const idx = this.index();
+    const out = [];
+    for (const t of Object.keys(FOUNDING)) {
+      for (const f of idx[t]) {
+        if (f === holder || !toArr(this.fm(f).changes).length) continue;
+        const segs = this.ownershipOf(f).filter((sg) => sg.holder.file === holder);
+        if (segs.length) out.push({ file: f, type: t, segs });
+      }
+    }
+    return out;
+  }
+  /* "1102 AD", "?" for a point, in its own calendar. */
+  yearOf(pt) { return pt ? pt.cal.yearText(pt.y, pt.d) : '?'; }
+  /* Writes `changes` (sorted by date) and keeps the holder field naming whoever holds it now. */
+  async saveChanges(f, rows) {
+    const type = this.typeOf(f);
+    const field = HOLDER_FIELD[type];
+    const parsed = rows.map((r) => Object.assign({}, r, { k: CHANGE_KINDS.find((x) => x.key === r.kind) || CHANGE_OTHER }))
+      .filter((r) => changeLine(r));
+    const g = (r) => { const pt = r.when ? this.toPt(r.when, f) : null; return pt ? this.gOf(pt) : null; };
+    parsed.forEach((r, i) => { r.g = g(r); r.i = i; });
+    parsed.sort((a, b) => (a.g == null) - (b.g == null) || (a.g || 0) - (b.g || 0) || a.i - b.i);
+    const now = this.latestPresent();
+    const gNow = now ? this.gOf(now) : null;
+    await this.app.fileManager.processFrontMatter(f, (fm) => {
+      if (field) {
+        const hands = parsed.filter((r) => r.k.act === 'hands' || r.k.act === 'free');
+        const cur = toArr(fm[field])[0];
+        /* Whoever the field named before the first recorded change held it first. */
+        if (hands.length && cur && !hands[0].from && !hands.some((r) => linkText(r.target) === linkText(cur))) hands[0].from = cur;
+        const live = hands.filter((r) => gNow == null || r.g == null || r.g <= gNow).pop();
+        const fd = TYPES[type].fields.find((x) => x.key === field);
+        if (live && live.k.act === 'free') delete fm[field];
+        else if (live && live.target && fd) {
+          /* Only a holder the field can take: a settlement's Nation must be a nation. */
+          const tf = /\[\[/.test(live.target) ? this.resolveLink(live.target, f) : null;
+          if (!tf || fd.types.includes(this.typeOf(tf))) fm[field] = fd.kind === 'links' ? [live.target] : live.target;
+        }
+      }
+      const lines = parsed.map(changeLine).filter(Boolean);
+      if (lines.length) fm.changes = lines; else delete fm.changes;
+    });
+    this.dropGraph();
+  }
+
   relLabel(kind, other) { const d = REL[kind]; return d ? d.l[this.genderOf(other)] : cap(kind); }
   isDead(f) {
     const fm = this.fm(f);
@@ -4691,16 +5331,16 @@ class LoresmithPlugin extends Plugin {
       if (!gr) { gr = { label, items: [] }; groups.set(label, gr); order.push(label); }
       const had = gr.items.find((x) => x.file === file);
       if (had) { if (!auto) { had.auto = false; had.field = field; } return; }
-      const former = myType === 'character' && g.types.get(file) === 'organization' ? this.memberStatus(me, file) === 'former'
-        : myType === 'organization' && g.types.get(file) === 'character' ? this.memberStatus(file, me) === 'former' : false;
+      const former = myType === 'character' && isGroupType(g.types.get(file)) && (g.types.get(file) === 'organization' || field === 'leaderOf' || /^Leader/.test(label)) ? this.memberStatus(me, file) === 'former'
+        : isGroupType(myType) && g.types.get(file) === 'character' && (myType === 'organization' || field === 'rulers' || /^Ruled/.test(label)) ? this.memberStatus(file, me) === 'former' : false;
       gr.items.push({ file, auto, field, role: roleFor(file), former });
     };
     const fieldDef = (t, k) => TYPES[t].fields.find((f) => f.key === k);
     for (const e of g.out.get(me) || []) {
       if (myType === 'character' && PERSON_FIELDS.has(e.field) && g.types.get(e.dest) === 'character') continue;
       if (WEB_SKIP_FIELDS.has(e.field) || (myType === 'species' && e.field === 'subspeciesOf')) continue;
-      if (opts.skipPeople && ['members', 'leaders', 'founders'].includes(e.field) && g.types.get(e.dest) === 'character') continue;
-      if (opts.skipGroups && ROLE_FIELDS.includes(e.field) && g.types.get(e.dest) === 'organization') continue;
+      if (opts.skipPeople && PEOPLE_FIELDS.includes(e.field) && g.types.get(e.dest) === 'character') continue;
+      if (opts.skipGroups && ROLE_FIELDS.includes(e.field) && isGroupType(g.types.get(e.dest))) continue;
       const fd = fieldDef(myType, e.field);
       put(fd ? fd.label : e.field, e.dest, false, e.field);
     }
@@ -4711,9 +5351,10 @@ class LoresmithPlugin extends Plugin {
       if (myType === 'character' && PERSON_FIELDS.has(e.field) && e.srcType === 'character') continue;
       if (myType === 'character' && key === 'event.participants') continue;
       if (opts.skipPeople && e.srcType === 'character' && ROLE_FIELDS.includes(e.field)) continue;
-      if (opts.skipGroups && e.srcType === 'organization' && ['members', 'leaders', 'founders'].includes(e.field)) continue;
+      if (opts.skipGroups && isGroupType(e.srcType) && PEOPLE_FIELDS.includes(e.field)) continue;
       const inv = INVERSE[key];
-      const merge = inv && inv.merge && fieldDef(myType, inv.merge);
+      const mk = inv && [].concat(inv.merge || []).find((k) => fieldDef(myType, k));
+      const merge = mk && fieldDef(myType, mk);
       const sfd = fieldDef(e.srcType, e.field);
       const label = merge ? merge.label : inv ? inv.label : `${TYPES[e.srcType].plural} (${sfd ? sfd.label.toLowerCase() : e.field})`;
       put(label, e.src, true, null);
@@ -4730,7 +5371,8 @@ class LoresmithPlugin extends Plugin {
     const spec = MIRROR[`${st}.${key}`];
     if (!spec || !TYPES[dt] || src === dest) return null;
     let tk = spec;
-    if (spec === '@parent') {
+    if (spec === '@leads') tk = dt === 'organization' ? 'leaders' : 'rulers';
+    else if (spec === '@parent') {
       const fm = this.fm(dest);
       const has = (k) => toArr(fm[k]).some((x) => this.resolveLink(x, dest) === src);
       if (has('mother')) tk = 'mother';
@@ -6388,6 +7030,7 @@ class LoresmithPlugin extends Plugin {
   async openEntity(file, typeHint) {
     const type = typeHint || this.typeOf(file);
     if (type === 'calendar') { new CalendarEditorModal(this.app, this, file).open(); return; }
+    if (type === 'map') return this.openMap(file);
     if (type === 'outline') { const st = this.storyFor(file); return st ? this.openOutline(st) : this.openNote(file); }
     if (!type || type === 'scene' || (TYPES[type] && TYPES[type].plain)) return this.openNote(file);
     const ws = this.app.workspace;
@@ -6550,12 +7193,23 @@ class LoresmithPlugin extends Plugin {
       }
     }
     if (opts.foundings) {
-      for (const o of [...idx.organization, ...idx.nation, ...idx.settlement]) {
-        const fm = this.fm(o);
-        const fd = this.toPt(fm.founded, o);
-        if (fd) add({ file: o, kind: 'founding', title: `${o.basename} is founded`, when: String(fm.founded), who: [], arcs: [], where: fm.headquarters || fm.capital || fm.partOf || null }, fd);
-        const end = this.toPt(fm.dissolved, o);
-        if (end) add({ file: o, kind: 'death', title: `${o.basename} falls`, when: String(fm.dissolved), who: [], arcs: [], where: null }, end);
+      for (const t of Object.keys(FOUNDING)) {
+        const w = FOUNDING[t];
+        for (const o of idx[t]) {
+          const fm = this.fm(o);
+          const fd = this.toPt(fm.founded, o);
+          if (fd) add({ file: o, kind: 'founding', title: `${o.basename} ${w.began}`, when: String(fm.founded), who: [], arcs: [], where: fm.headquarters || fm.capital || fm.partOf || null }, fd);
+          const end = this.toPt(fm.dissolved, o);
+          const gEnd = end ? this.gOf(end) : null;
+          if (end) add({ file: o, kind: 'death', title: `${this.nameAt(o, gEnd)} ${endedPhrase(fm.ended_how) || w.ended}`, when: String(fm.dissolved), who: [], arcs: [], where: null }, end);
+          for (const c of this.historyOf(o)) {
+            if (!c.pt || (c.k.act === 'end' && gEnd != null && c.g === gEnd)) continue;
+            add({
+              file: o, kind: c.k.act === 'end' ? 'death' : 'founding', title: this.changeText(o, c), when: c.when,
+              sub: c.k === CHANGE_OTHER ? '' : c.note, who: [c.target, c.from].filter((v) => /\[\[/.test(v)), arcs: [], where: null,
+            }, c.pt);
+          }
+        }
       }
     }
     if (opts.calendar) {
@@ -7227,7 +7881,12 @@ class OverviewView extends ItemView {
       head.createSpan({ cls: 'ls-card-title', text: f.basename });
       const sub = this.subtitle(f, type);
       if (sub) card.createDiv({ cls: 'ls-card-sub', text: sub });
-      const snip = type === 'calendar' ? '' : snippetOf(texts[i]);
+      if (def.thumb) {
+        const img = p.resolveLink(p.fm(f).image, f);
+        if (img && IMAGE_EXT.includes(img.extension.toLowerCase())) card.createEl('img', { cls: 'ls-card-thumb', attr: { src: this.app.vault.getResourcePath(img), alt: '', loading: 'lazy' } });
+        else card.createDiv({ cls: 'ls-card-thumb is-empty', text: 'No image yet' });
+      }
+      const snip = type === 'calendar' || def.thumb ? '' : snippetOf(texts[i]);
       card.createDiv({ cls: 'ls-card-snippet' + (snip ? '' : ' is-empty'), text: snip || 'Nothing written yet.' });
       const tags = p.tagsOf(f);
       if (tags.length) { const tg = card.createDiv('ls-tags'); for (const t of tags) tg.createSpan({ cls: 'ls-tag', text: t }); }
@@ -7239,6 +7898,8 @@ class OverviewView extends ItemView {
     const p = this.plugin;
     const fm = p.fm(f);
     const name = (s) => { const d = p.resolveLink(s, f); return d ? d.basename : linkText(s); };
+    const ended = FOUNDING[type] ? p.endOf(f) : null;
+    const gone = ended ? `${(ended.how || FOUNDING[type].end).toLowerCase()} ${ended.pt.raw || p.yearOf(ended.pt)}` : '';
     if (type === 'character') return [p.birthNameText(f), fm.epithet || (fm.role && cap(String(fm.role))), fm.category && cap(String(fm.category))].filter(Boolean).join(', ');
     if (type === 'relation') {
       const pair = [fm.from, fm.to].filter(Boolean).map(name).join(' and ');
@@ -7256,15 +7917,16 @@ class OverviewView extends ItemView {
       const extra = type === 'creature' ? fm.threat : fm.toxicity;
       return [cls, par && `Variant of ${par.basename}`, extra].filter(Boolean).map(String).join(', ');
     }
-    if (type === 'organization' && fm.partOf) return [fm.kind, `part of ${name(fm.partOf)}`].filter(Boolean).map(String).join(', ');
-    if (type === 'nation') {
-      const ended = fm.dissolved ? `fell ${fm.dissolved}` : '';
-      return [fm.kind, fm.capital && `capital ${name(fm.capital)}`, fm.partOf && `under ${name(fm.partOf)}`, ended].filter(Boolean).map(String).join(', ');
-    }
-    if (type === 'settlement') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, fm.nation && name(fm.nation), fm.population && `pop. ${fm.population}`].filter(Boolean).map(String).join(', ');
-    if (type === 'region') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, fm.terrain].filter(Boolean).map(String).join(', ');
-    if (type === 'location' && fm.partOf) return [fm.kind, `in ${name(fm.partOf)}`].filter(Boolean).join(', ');
+    if (type === 'organization' && (fm.partOf || gone)) return [fm.kind, fm.partOf && `part of ${name(fm.partOf)}`, gone].filter(Boolean).map(String).join(', ');
+    if (type === 'nation') return [fm.kind, fm.capital && `capital ${name(fm.capital)}`, fm.partOf && `under ${name(fm.partOf)}`, gone].filter(Boolean).map(String).join(', ');
+    if (type === 'settlement') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, fm.nation && name(fm.nation), fm.population && `pop. ${fm.population}`, gone].filter(Boolean).map(String).join(', ');
+    if (type === 'region') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, fm.terrain, gone].filter(Boolean).map(String).join(', ');
+    if (type === 'location') return [fm.kind, fm.partOf && `in ${name(fm.partOf)}`, gone].filter(Boolean).map(String).join(', ');
     if (type === 'arc') return [fm.kind, fm.status].filter(Boolean).map(String).join(', ');
+    if (type === 'map') {
+      const n = (k) => toArr(fm[k]).length;
+      return [fm.kind, fm.of && `of ${name(fm.of)}`, n('pins') && `${n('pins')} pin${n('pins') === 1 ? '' : 's'}`, n('areas') && `${n('areas')} area${n('areas') === 1 ? '' : 's'}`].filter(Boolean).map(String).join(', ');
+    }
     if (type === 'event') return [fm.date, fm.kind].filter(Boolean).map(String).join(', ');
     if (type === 'calendar') {
       const c = p.world().byFile.get(f.path);
@@ -7524,11 +8186,20 @@ class OverviewView extends ItemView {
       yearly(fm.born, c, (n) => ({ key: 'birthday', kind: 'birth', label: `${c.basename} turns ${n}`, note: 'Birthday', open }), p.toPt(fm.died, c));
       yearly(fm.died, c, (n) => ({ key: 'anniversary', kind: 'death', label: `† ${c.basename} · ${yrs(n)}`, note: `Died ${n} year${n === 1 ? '' : 's'} ago`, open }));
     }
-    for (const o of [...idx.organization, ...idx.nation, ...idx.settlement]) {
-      const founded = p.fm(o).founded;
-      const open = () => p.openEntity(o);
-      on(founded, o, { key: 'founding', kind: 'founding', label: `${o.basename} founded`, open });
-      yearly(founded, o, (n) => ({ key: 'anniversary', kind: 'founding', label: `${o.basename} · ${yrs(n)}`, note: `Founded ${n} year${n === 1 ? '' : 's'} ago`, open }));
+    for (const t of Object.keys(FOUNDING)) {
+      const w = FOUNDING[t];
+      for (const o of idx[t]) {
+        const { founded, dissolved } = p.fm(o);
+        const open = () => p.openEntity(o);
+        on(founded, o, { key: 'founding', kind: 'founding', label: `${o.basename} ${w.start.toLowerCase()}`, open });
+        const how = p.fm(o).ended_how;
+        on(dissolved, o, { key: 'founding', kind: 'death', label: `${o.basename} ${how ? String(how).toLowerCase() : w.end.toLowerCase()}`, open });
+        const gone = p.endOf(o);
+        yearly(founded, o, (n) => ({ key: 'anniversary', kind: 'founding', label: `${o.basename} · ${yrs(n)}`, note: `${w.start} ${n} year${n === 1 ? '' : 's'} ago`, open }), gone ? gone.pt : null);
+        for (const c of p.historyOf(o)) {
+          if (c.pt && c.pt.d != null) on(c.pt, o, { key: 'founding', kind: c.k.act === 'end' ? 'death' : 'founding', label: p.changeText(o, c), note: c.k === CHANGE_OTHER ? '' : c.note, open });
+        }
+      }
     }
 
     /* Story and chapter dates. `hosts` remembers every story or chapter that has a date at all, so a scene
@@ -8850,11 +9521,15 @@ class EntityView extends ItemView {
     this.renderDetails(main, fm, parsed);
     if (def.computed && type === 'arc') await this.renderArcComputed(main, fm);
     else if (def.computed) await this.renderComputed(main, fm);
-    if (type === 'organization') this.renderPeople(main);
+    if (type === 'organization') { this.renderRanks(main); this.renderPeople(main); }
+    if (RULED.includes(type)) this.renderPeople(main, { ruled: true });
     if (type === 'species') this.renderSpeciesMembers(main);
     if (type === 'creature' || type === 'plant') this.renderNatureFacts(secGrid, fm, type);
     if (type === 'language') this.renderLanguageWords(main);
+    if (FOUNDING[type]) this.renderHistory(main, fm, type);
+    if (type === 'nation' || type === 'organization') this.renderHoldings(main);
     if (type !== 'character' && type !== 'story') this.renderConnections(main);
+    if (type !== 'story' && type !== 'word') this.renderOnMap(main, type);
     if (def.notesKeys) this.renderAuthorNotes(main, splitFm(content).body, def.notesKeys);
     if (type !== 'word') {
       const mood = toArr(fm.moodboard);
@@ -9069,10 +9744,10 @@ class EntityView extends ItemView {
     if (fm.occupation) fact('briefcase', String(fm.occupation));
     const es = p.roleEntriesOf(me);
     const act = es.filter((e) => e.status === 'active');
-    for (const e of act.slice(0, 3)) fact('id-card', `${e.title || 'Member'}, ${e.org.basename}`, '', () => p.openEntity(e.org, 'organization'));
+    for (const e of act.slice(0, 3)) fact(RULED.includes(p.typeOf(e.org)) ? 'crown' : 'id-card', `${e.title || (RULED.includes(p.typeOf(e.org)) ? 'Ruler' : 'Member')}, ${e.org.basename}`, '', () => p.openEntity(e.org));
     if (!act.length) {
       const last = es.filter((e) => e.status === 'former').pop();
-      if (last) fact('history', `${p.roleText(last)}, ${last.org.basename}`, 'is-former', () => p.openEntity(last.org, 'organization'));
+      if (last) fact('history', `${p.roleText(last)}, ${last.org.basename}`, 'is-former', () => p.openEntity(last.org));
     }
     for (const s of toArr(fm.residence).slice(0, 2)) {
       const d = p.resolveLink(s, me);
@@ -9475,11 +10150,96 @@ class EntityView extends ItemView {
     }
   }
 
-  /* Everyone in an organization: current people grouped by role or by subdivision (house, department),
-     then former members, with every title they've held acknowledged. */
-  renderPeople(main) {
+  /* An organization's ranks, highest first: reorder, rename, add, remove. Subdivisions use their parent's ranks until
+     they're given their own. */
+  renderRanks(main) {
     const p = this.plugin;
     const me = this.file;
+    const { list: ranks, from } = p.ranksOf(me);
+    const own = from === me;
+    const key = '__ranks';
+    this._ranksSeen = this._ranksSeen || new Set();
+    if (!ranks.length && !this._ranksSeen.has(me.path)) this.collapsed.add(key);
+    this._ranksSeen.add(me.path);
+    const body = this.block(main, ranks.length ? `Ranks (${ranks.length})` : 'Ranks', key);
+    const save = async (change) => { this.selfWrite = Date.now() + 3000; await p.setRanks(me, change); this.render(); };
+
+    /* Who holds each rank now, from this group and its subdivisions. */
+    const people = p.peopleOf(me).filter((r) => r.status !== 'former');
+    const holders = ranks.map(() => []);
+    for (const r of people) { const i = p.personRank(me, r, ranks); if (i >= 0) holders[i].push(r.file); }
+
+    if (!own && ranks.length) {
+      const note = body.createDiv('ls-hint ls-rank-from');
+      note.createSpan({ text: 'Uses the ranks of ' });
+      const a = note.createSpan({ cls: 'is-link', text: from.basename });
+      a.addEventListener('click', () => p.openEntity(from, 'organization'));
+      note.createSpan({ text: '. ' });
+      const c = note.createSpan({ cls: 'is-link', text: `Give ${me.basename} its own` });
+      c.addEventListener('click', () => save(() => ranks.slice()));
+    } else if (!ranks.length) {
+      body.createDiv({ cls: 'ls-hint', text: 'If this group has ranks, list them here, highest first: Grand Master, Knight-Commander, Knight, Squire. The rank is the first part of someone\'s title ("Knight, Order of the Rose" is a Knight), so people are listed in rank order, ranks are suggested when you set someone\'s role, and groups that are part of this one use the same ranks.' });
+    }
+
+    const ladder = body.createDiv('ls-ranks');
+    ranks.forEach((rank, i) => {
+      const row = ladder.createDiv('ls-rank-row');
+      row.createSpan({ cls: 'ls-rank-num', text: String(i + 1) });
+      if (own) {
+        const inp = row.createEl('input', { type: 'text', cls: 'ls-input ls-rank-name', attr: { 'aria-label': `Rank ${i + 1}` } });
+        inp.value = rank;
+        inp.addEventListener('change', () => { const v = inp.value; save((n) => { const j = n.indexOf(rank); if (j >= 0) n[j] = v; return n; }); });
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
+      } else row.createSpan({ cls: 'ls-rank-name', text: rank });
+      const who = row.createDiv('ls-rank-who');
+      for (const f of holders[i].slice(0, 5)) {
+        const av = avatarEl(who, p, f, 'is-tiny');
+        av.setAttr('aria-label', f.basename);
+        av.addEventListener('click', () => p.openEntity(f, 'character'));
+      }
+      if (holders[i].length > 5) who.createSpan({ cls: 'ls-muted', text: `+${holders[i].length - 5}` });
+      if (!holders[i].length) who.createSpan({ cls: 'ls-muted', text: 'Nobody' });
+      if (own) {
+        const tools = row.createDiv('ls-rank-tools');
+        const b1 = iconBtn(tools, 'arrow-up', 'Move up (higher)', () => save((n) => { const j = n.indexOf(rank); if (j > 0) [n[j - 1], n[j]] = [n[j], n[j - 1]]; return n; }));
+        if (i === 0) b1.disabled = true;
+        const b2 = iconBtn(tools, 'arrow-down', 'Move down (lower)', () => save((n) => { const j = n.indexOf(rank); if (j >= 0 && j < n.length - 1) [n[j + 1], n[j]] = [n[j], n[j + 1]]; return n; }));
+        if (i === ranks.length - 1) b2.disabled = true;
+        iconBtn(tools, 'x', 'Remove rank', () => save((n) => n.filter((x) => x !== rank)));
+      }
+    });
+
+    if (own || !ranks.length) {
+      const add = body.createDiv('ls-rank-add');
+      const inp = add.createEl('input', { type: 'text', cls: 'ls-input', attr: { placeholder: ranks.length ? 'Add a rank below the others' : 'Highest rank', 'aria-label': 'New rank' } });
+      const go = () => { const v = inp.value; if (v.trim()) { inp.value = ''; save((n) => [...n, v]); } };
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      textBtn(add, 'Add rank', go);
+      /* Titles people already have here that aren't ranks yet: one tap adds them. */
+      const titles = new Map();
+      for (const r of p.peopleOf(me)) {
+        for (const t of [...(r.entries || []).map((e) => e.title), ...r.subs.map((x) => x.title)]) {
+          const h = String(t || '').split(',')[0].trim().replace(/^(former\s+|ex-)/i, '');
+          if (h && p.rankIndex(me, h, ranks) < 0 && !titles.has(h.toLowerCase())) titles.set(h.toLowerCase(), h);
+        }
+      }
+      if (titles.size) {
+        const row = body.createDiv('ls-rank-suggest');
+        row.createSpan({ cls: 'ls-muted', text: 'Titles in use:' });
+        for (const t of [...titles.values()].sort(natural)) {
+          const b = textBtn(row, t, () => save((n) => [...n, t]), 'ls-chip-add');
+          b.setAttr('aria-label', `Add ${t} as a rank`);
+        }
+      }
+    }
+  }
+
+  /* Everyone in an organization: current people grouped by role or by subdivision (house, department),
+     then former members, with every title they've held acknowledged. */
+  renderPeople(main, opts = {}) {
+    const p = this.plugin;
+    const me = this.file;
+    const ruled = !!opts.ruled;
     const people = p.peopleOf(me);
     const subs = p.subdivisionsOf(me);
     const word = p.subdivisionWord(me);
@@ -9489,12 +10249,13 @@ class EntityView extends ItemView {
     const setView = (k, v) => { p.settings.peopleView[me.path] = Object.assign({}, view, { [k]: v }); p.saveSoon(); this.render(); };
     const current = people.filter((r) => r.status !== 'former');
     const former = people.filter((r) => r.status === 'former');
-    const body = this.block(main, people.length ? `People (${current.length}${former.length ? `, ${former.length} former` : ''})` : 'People', '__people');
+    const head = ruled ? 'Rulers' : 'People';
+    const body = this.block(main, people.length ? `${head} (${current.length}${former.length ? `, ${former.length} former` : ''})` : head, ruled ? '__rulers' : '__people');
 
     const bar = body.createDiv('ls-rel-bar');
-    const add = textBtn(bar, 'Add person', () => new EntitySuggest(this.app, p, ['character'], async (c) => {
+    const add = textBtn(bar, ruled ? 'Add ruler' : 'Add person', () => new EntitySuggest(this.app, p, ['character'], async (c) => {
       this.selfWrite = Date.now() + 1500;
-      await p.addLink(me, 'members', c);
+      await p.addLink(me, ruled ? 'rulers' : 'members', c);
       this.editRole(c, me, true);
     }, me).open(), 'ls-chip-add');
     setIcon(add.createSpan({ cls: 'ls-btn-icon' }), 'plus');
@@ -9510,6 +10271,10 @@ class EntityView extends ItemView {
       const t = textBtn(bar, `Show former (${former.length})`, () => setView('former', !showFormer), 'ls-toggle' + (showFormer ? ' is-active' : ''));
       t.setAttr('aria-pressed', String(showFormer));
     }
+    if (!people.length && ruled) {
+      body.createDiv({ cls: 'ls-muted', text: `Add who rules ${me.basename}, or set it from a character's Leader of. Give each a title and years, like "Queen (1102–1130)", and past rulers move to their own list.` });
+      return;
+    }
     if (!people.length) {
       body.createDiv({ cls: 'ls-muted', text: subs.length
         ? `Add people here, or to its ${word === 'subgroup' ? 'subgroups' : word + 's'} (${subs.map((s) => s.basename).join(', ')}). Give each a role, like "Professor, Potions" or "Student, 5th year".`
@@ -9518,6 +10283,15 @@ class EntityView extends ItemView {
     }
 
     const subsOf = (r, all) => [...new Set(r.subs.filter((s) => all || s.status !== 'former').map((s) => s.org))];
+    /* Ranks, highest first, put the groups and the people in each group in order. */
+    const ranks = ruled ? [] : p.ranksOf(me).list;
+    const rankOfHead = (k) => p.rankIndex(me, k, ranks);
+    const rankIn = (r, sub) => {
+      if (!ranks.length) return -1;
+      if (sub) { const st = r.subs.find((x) => x.org === sub && x.title); const i = st ? p.rankIndex(me, st.title, ranks) : -1; if (i >= 0) return i; }
+      return p.personRank(me, r, ranks);
+    };
+    const byRank = (a, b) => (a < 0) - (b < 0) || a - b;
     const grouped = (list, isFormer) => {
       const groups = new Map();
       const put = (k, r) => { if (!groups.has(k)) groups.set(k, []); if (!groups.get(k).includes(r)) groups.get(k).push(r); };
@@ -9531,7 +10305,11 @@ class EntityView extends ItemView {
       const order = by === 'sub' ? subs.map((s) => s.basename) : [];
       return [...groups.entries()].sort(([a, la], [b, lb]) => {
         if (by === 'sub') return (order.indexOf(a) < 0) - (order.indexOf(b) < 0) || order.indexOf(a) - order.indexOf(b);
-        return (b === 'Leader') - (a === 'Leader') || (a === 'Member') - (b === 'Member') || (lb.length - la.length) || natural(a, b);
+        if (ranks.length) {
+          const ra = rankOfHead(a), rb = rankOfHead(b);
+          if (ra >= 0 || rb >= 0) return (b === 'Leader' && ra < 0) - (a === 'Leader' && rb < 0) || byRank(ra, rb);
+        }
+        return (b === 'Leader') - (a === 'Leader') || (a === 'Member' || a === 'Ruler') - (b === 'Member' || b === 'Ruler') || (lb.length - la.length) || natural(a, b);
       });
     };
     const card = (grid, r, isFormer) => {
@@ -9541,10 +10319,11 @@ class EntityView extends ItemView {
       t.createDiv({ cls: 'ls-rel-name', text: r.file.basename });
       const e = r.entry;
       const parts = [];
-      if (isFormer) parts.push(e ? p.roleText(e) : r.founder && !r.direct ? 'Founder' : 'Former member');
+      if (isFormer) parts.push(e && e.title ? p.roleText(e) : r.founder && !r.direct ? 'Founder' : ruled ? 'Former ruler' : 'Former member');
       else if (by === 'sub') parts.push(e && e.title ? e.title : r.head);
       else if (e && e.title && e.title.includes(',')) parts.push(e.title.slice(e.title.indexOf(',') + 1).trim());
       if (r.status === 'future') parts.push('not yet');
+      if (by === 'sub' && ranks.length) { const ri = rankIn(r, this._peopleSub); if (ri >= 0 && !(e && e.title && rankOfHead(e.title) === ri)) parts.unshift(ranks[ri].split('/')[0].trim()); }
       if (by === 'role') { const ss = subsOf(r, isFormer); if (ss.length) parts.push(ss.map((s) => s.basename).join(', ')); }
       if (e && p.roleYears(e)) parts.push(p.roleYears(e));
       if (parts.length) t.createDiv({ cls: 'ls-rel-label', text: parts.join(' · ') });
@@ -9558,17 +10337,23 @@ class EntityView extends ItemView {
     };
     const section = (list, isFormer) => {
       for (const [k, items] of grouped(list, isFormer)) {
-        body.createDiv({ cls: 'ls-rel-group', text: `${k} (${items.length})` });
+        const gh = body.createDiv({ cls: 'ls-rel-group' });
+        const ri = by === 'role' ? rankOfHead(k) : -1;
+        if (ri >= 0) gh.createSpan({ cls: 'ls-rank-num', text: String(ri + 1), attr: { 'aria-label': `Rank ${ri + 1} of ${ranks.length}` } });
+        gh.createSpan({ text: `${k} (${items.length})` });
+        const sub = by === 'sub' ? subs.find((s) => s.basename === k) || null : null;
+        this._peopleSub = sub;
         const grid = body.createDiv('ls-rel-cards');
-        for (const r of items.sort((a, b) => natural(a.file.basename, b.file.basename))) card(grid, r, isFormer);
+        items.sort((a, b) => byRank(rankIn(a, sub), rankIn(b, sub)) || natural(a.file.basename, b.file.basename));
+        for (const r of items) card(grid, r, isFormer);
       }
     };
     if (current.length) section(current, false);
-    else body.createDiv({ cls: 'ls-muted', text: 'Nobody is active here right now.' });
+    else body.createDiv({ cls: 'ls-muted', text: ruled ? 'Nobody rules here right now.' : 'Nobody is active here right now.' });
     if (former.length && showFormer) {
       const h = body.createDiv('ls-people-former-head');
       setIcon(h.createSpan('ls-people-former-icon'), 'history');
-      h.createSpan({ text: `Former members (${former.length})` });
+      h.createSpan({ text: `${ruled ? 'Former rulers' : 'Former members'} (${former.length})` });
       section(former, true);
     }
   }
@@ -9720,10 +10505,10 @@ class EntityView extends ItemView {
     const me = this.file;
     const g = p.graph();
     const orgs = new Set();
-    for (const e of g.out.get(me) || []) if (ROLE_FIELDS.includes(e.field) && g.types.get(e.dest) === 'organization') orgs.add(e.dest);
-    for (const e of g.inn.get(me) || []) if (e.srcType === 'organization' && ['members', 'leaders', 'founders'].includes(e.field)) orgs.add(e.src);
+    for (const e of g.out.get(me) || []) if (ROLE_FIELDS.includes(e.field) && isGroupType(g.types.get(e.dest))) orgs.add(e.dest);
+    for (const e of g.inn.get(me) || []) if (isGroupType(e.srcType) && PEOPLE_FIELDS.includes(e.field)) orgs.add(e.src);
     const entries = p.roleEntriesOf(me);
-    for (const e of entries) if (p.typeOf(e.org) === 'organization') orgs.add(e.org);
+    for (const e of entries) if (isGroupType(p.typeOf(e.org))) orgs.add(e.org);
     if (!orgs.size) return;
     const list = [...orgs].map((o) => ({ org: o, status: p.memberStatus(me, o), es: entries.filter((e) => e.org === o) }))
       .sort((a, b) => (a.status === 'former') - (b.status === 'former') || natural(a.org.basename, b.org.basename));
@@ -9732,9 +10517,11 @@ class EntityView extends ItemView {
     for (const it of list) {
       const row = box.createDiv('ls-position' + (it.status === 'former' ? ' is-former' : ''));
       const head = row.createDiv('ls-position-head');
-      setIcon(head.createSpan('ls-position-icon'), TYPES.organization.icon);
+      const ot = p.typeOf(it.org);
+      const place = RULED.includes(ot);
+      setIcon(head.createSpan('ls-position-icon'), TYPES[ot].icon);
       const name = head.createSpan({ cls: 'ls-position-name', text: it.org.basename });
-      name.addEventListener('click', () => p.openEntity(it.org, 'organization'));
+      name.addEventListener('click', () => p.openEntity(it.org));
       const ofm = p.fm(it.org);
       const parent = p.resolveLink(ofm.partOf, it.org);
       const meta = [ofm.kind && String(ofm.kind), parent && `part of ${parent.basename}`].filter(Boolean).join(', ');
@@ -9742,12 +10529,16 @@ class EntityView extends ItemView {
       head.createSpan({ cls: `ls-pill ls-status-pill is-${it.status}`, text: it.status === 'former' ? 'Former' : it.status === 'future' ? 'Not yet' : 'Active' });
       iconBtn(head, 'pencil', `Edit roles at ${it.org.basename}`, () => this.editRole(me, it.org), 'ls-position-edit');
       const lines = row.createDiv('ls-position-roles');
-      if (!it.es.length) lines.createDiv({ cls: 'ls-position-role is-empty', text: it.status === 'former' ? 'Former member' : 'Member, no title set' });
+      const who = place ? 'Ruler' : 'Member';
+      if (!it.es.length) lines.createDiv({ cls: 'ls-position-role is-empty', text: it.status === 'former' ? `Former ${who.toLowerCase()}` : `${who}, no title set` });
       for (const e of it.es) {
         const l = lines.createDiv({ cls: `ls-position-role is-${e.status}` });
-        l.createSpan({ cls: 'ls-position-title', text: e.status === 'former' ? `${e.title || 'Member'}` : (e.title || 'Member') });
+        l.createSpan({ cls: 'ls-position-title', text: e.title || who });
         const y = p.roleYears(e);
         if (y) l.createSpan({ cls: 'ls-position-years', text: y });
+        const rl = p.ranksOf(it.org).list;
+        const ri = p.rankIndex(it.org, e.title, rl);
+        if (ri >= 0) l.createSpan({ cls: 'ls-position-rank', text: `rank ${ri + 1} of ${rl.length}` });
         if (e.status !== 'active') l.createSpan({ cls: 'ls-position-state', text: e.status === 'former' ? 'former' : 'not yet' });
       }
     }
@@ -9762,11 +10553,126 @@ class EntityView extends ItemView {
     if (justAdded) this.refreshSoon();
   }
 
+  /* Every map this entry is on, as a cropped preview that opens the map focused on it. */
+  renderOnMap(main, type) {
+    const p = this.plugin;
+    const me = this.file;
+    const hits = p.mapsWith(me);
+    if (!hits.length && !p.index().map.length) return;
+    const body = this.block(main, hits.length ? `On the map (${hits.length})` : 'On the map', '__onmap');
+    const grid = body.createDiv('ls-onmap');
+    for (const h of hits) {
+      const card = grid.createDiv({ cls: 'ls-onmap-card', attr: { tabindex: '0', role: 'button', 'aria-label': `Open ${h.map.basename} at ${me.basename}` } });
+      mapThumb(card, p, h);
+      card.createDiv({ cls: 'ls-onmap-name', text: h.map.basename });
+      const open = () => p.openMap(h.map, { focus: me.path });
+      card.addEventListener('click', open);
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter') open(); });
+    }
+    if (!hits.length) body.createDiv({ cls: 'ls-muted', text: 'Not on any map yet.' });
+    const bar = body.createDiv('ls-rel-bar');
+    const area = PLACES.includes(type) && type !== 'location';
+    const b1 = textBtn(bar, 'Place a pin on a map', () => p.placeOnMap(me, 'pin'), 'ls-chip-add');
+    setIcon(b1.createSpan({ cls: 'ls-btn-icon' }), 'map-pin'); b1.prepend(b1.lastChild);
+    const b2 = textBtn(bar, 'Draw it on a map', () => p.placeOnMap(me, 'area'), 'ls-chip-add');
+    setIcon(b2.createSpan({ cls: 'ls-btn-icon' }), 'pentagon'); b2.prepend(b2.lastChild);
+    if (area) bar.prepend(b2);
+  }
+
+  /* A place's or group's life: what it's called, who holds it, whether it still stands, and every dated change. */
+  renderHistory(main, fm, type) {
+    const p = this.plugin;
+    const me = this.file;
+    const w = FOUNDING[type];
+    const hist = p.historyOf(me);
+    const start = p.toPt(fm.founded, me);
+    const end = p.endOf(me);
+    const owners = p.ownershipOf(me);
+    const now = p.latestPresent();
+    const body = this.block(main, hist.length ? `Through history (${hist.length})` : 'Through history', '__history');
+
+    /* Now: name, holder, standing. */
+    const facts = body.createDiv('ls-hero-facts ls-hist-facts');
+    const fact = (icon, text, cls, onClick) => {
+      const el = iconText(facts, icon, text, 'ls-fact' + (cls ? ' ' + cls : ''));
+      if (onClick) { el.addClass('is-link'); el.addEventListener('click', onClick); }
+    };
+    const gNow = now ? p.gOf(now) : null;
+    const called = p.nameAt(me, gNow);
+    if (called !== me.basename) fact('tag', `Now called ${called}`);
+    const holder = owners.filter((sg) => sg.status === 'now').pop();
+    if (holder) {
+      const h = holder.holder;
+      fact('crown', `Held by ${h.text}${holder.from ? ` since ${p.yearOf(holder.from)}` : ''}`, '', h.file ? () => p.openEntity(h.file) : null);
+    }
+    if (end) fact('skull', `${end.how || w.end} ${p.yearOf(end.pt)}`, 'is-dead');
+    else if (start) fact('landmark', `${w.start} ${p.yearOf(start)}`);
+
+    /* Who held it, in order. */
+    if (owners.length > 1 || (owners.length && hist.length)) {
+      body.createDiv({ cls: 'ls-pv-label', text: 'Held by' });
+      const list = body.createDiv('ls-hist-owners');
+      for (const sg of owners) {
+        const row = list.createDiv(`ls-hist-owner is-${sg.status}`);
+        const n = row.createSpan({ cls: 'ls-hist-owner-name' + (sg.holder.file ? ' is-link' : ''), text: sg.holder.text });
+        if (sg.holder.file) n.addEventListener('click', () => p.openEntity(sg.holder.file));
+        const span = `${sg.from ? p.yearOf(sg.from) : '?'} – ${sg.to ? p.yearOf(sg.to) : sg.status === 'now' ? 'present' : ''}`;
+        row.createSpan({ cls: 'ls-hist-owner-years', text: span });
+      }
+    }
+
+    /* Every dated change, with its founding and end. */
+    const list = body.createDiv('ls-hist-list');
+    const line = (when, text, note, cls, icon) => {
+      const row = list.createDiv('ls-hist-row' + (cls ? ' ' + cls : ''));
+      setIcon(row.createSpan('ls-hist-icon'), icon);
+      row.createSpan({ cls: 'ls-hist-when', text: when || 'No date' });
+      const t = row.createDiv('ls-hist-text');
+      t.createDiv({ text });
+      if (note) t.createDiv({ cls: 'ls-muted', text: note });
+    };
+    const icons = { name: 'pencil', hands: 'flag', free: 'flag-off', end: 'skull', back: 'hammer', note: 'scroll-text' };
+    if (start) line(p.yearOf(start), `${p.nameAt(me, p.gOf(start))} ${w.began}`, '', 'is-start', 'landmark');
+    for (const c of hist) line(c.pt ? p.yearOf(c.pt) : c.when, p.changeText(me, c), c.k === CHANGE_OTHER ? '' : c.note, `is-${c.k.act}`, icons[c.k.act]);
+    const d = p.toPt(fm.dissolved, me);
+    if (d) line(p.yearOf(d), `${p.nameAt(me, p.gOf(d))} ${endedPhrase(fm.ended_how) || w.ended}`, '', 'is-end', 'skull');
+    if (!list.childElementCount) list.createDiv({ cls: 'ls-muted', text: `Record what happened to it over the years: new names, who conquered or inherited it, when it was destroyed and rebuilt. Each change goes on the timeline and the calendar.` });
+
+    const bar = body.createDiv('ls-rel-bar');
+    const add = textBtn(bar, hist.length ? 'Edit history' : 'Add a change', () => new ChangesModal(this.app, p, me, () => { this.selfWrite = Date.now() + 1500; this.refreshSoon(); }).open(), 'ls-chip-add');
+    setIcon(add.createSpan({ cls: 'ls-btn-icon' }), hist.length ? 'pencil' : 'plus');
+    add.prepend(add.lastChild);
+  }
+
+  /* On a nation or group: places and groups it held at some point, through their histories. */
+  renderHoldings(main) {
+    const p = this.plugin;
+    const held = p.holdingsOf(this.file);
+    if (!held.length) return;
+    const body = this.block(main, `Held over time (${held.length})`, '__holdings');
+    const now = held.filter((h) => h.segs.some((sg) => sg.status === 'now'));
+    const was = held.filter((h) => !now.includes(h));
+    const group = (label, items) => {
+      if (!items.length) return;
+      body.createDiv({ cls: 'ls-rel-group', text: label });
+      const list = body.createDiv('ls-hist-owners');
+      for (const h of items.sort((a, b) => natural(a.file.basename, b.file.basename))) {
+        const row = list.createDiv('ls-hist-owner' + (now.includes(h) ? ' is-now' : ' is-past'));
+        setIcon(row.createSpan('ls-hist-icon'), TYPES[h.type].icon);
+        const n = row.createSpan({ cls: 'ls-hist-owner-name is-link', text: h.file.basename });
+        n.addEventListener('click', () => p.openEntity(h.file));
+        row.createSpan({ cls: 'ls-hist-owner-years', text: h.segs.map((sg) => `${sg.from ? p.yearOf(sg.from) : '?'} – ${sg.to ? p.yearOf(sg.to) : sg.status === 'now' ? 'present' : ''}`).join('; ') });
+      }
+    };
+    group('Holds now', now);
+    group('Held once', was);
+  }
+
   /* Places, groups, things and stories linked to this entry, from its own fields and from other notes. */
   renderConnections(main) {
     const p = this.plugin;
     const me = this.file;
-    const isOrg = p.typeOf(me) === 'organization';
+    const isOrg = isGroupType(p.typeOf(me));
     const groups = p.connectionsOf(me, { skipPeople: isOrg, skipGroups: p.typeOf(me) === 'character' });
     const total = groups.reduce((n, g) => n + g.items.length, 0);
     const body = this.block(main, total ? `Connections (${total})` : 'Connections', '__conn');
@@ -9788,7 +10694,7 @@ class EntityView extends ItemView {
         if (it.role) chip.createSpan({ cls: 'ls-chip-note', text: it.role });
         if (it.auto) chip.setAttr('aria-label', `Listed on ${it.file.basename}'s page`);
         chip.addEventListener('click', () => p.openEntity(it.file, t));
-        if (p.typeOf(me) === 'character' && t === 'organization') {
+        if (p.typeOf(me) === 'character' && (t === 'organization' || (RULED.includes(t) && it.field === 'leaderOf'))) {
           iconBtn(chip, 'pencil', it.role ? `Change role at ${it.file.basename}` : `Set role at ${it.file.basename}`, () => this.editRole(me, it.file));
         }
       }
@@ -9919,7 +10825,7 @@ class EntityView extends ItemView {
 
     this.nameInputs = {};
     const yearInputs = {};
-    const hintAfter = { character: 'died', organization: 'founded', nation: 'dissolved', settlement: 'founded', event: 'end', holiday: 'last_held' }[type];
+    const hintAfter = FOUNDING[type] ? 'dissolved' : { character: 'died', event: 'end', holiday: 'last_held' }[type];
     const closed = new Set(toArr(p.settings.sheetGroups[type]));
     let group = null;
     let box = props;
@@ -10086,14 +10992,18 @@ class EntityView extends ItemView {
           if (a) lines.push(`${s.basename} (${y.raw}): ${a.text}`);
         }
         for (const k of ['born', 'died']) lines.push(...this.otherCalLines(val(k), k === 'born' ? 'Born' : 'Died'));
-      } else if (type === 'organization' || type === 'nation' || type === 'settlement') {
+      } else if (FOUNDING[type]) {
+        const w = FOUNDING[type];
         const y = p.toPt(val('founded'), this.file);
-        const end = type === 'nation' ? p.toPt(val('dissolved'), this.file) : null;
-        if (y && end) lines.push(`Stood for ${fmtNum(p.spanYears(y, end))} years`);
-        if (end && now) lines.push(`Fell ${p.agoText(end, now)}, as of ${now.raw}`);
-        else if (y && now) lines.push(`Founded ${p.agoText(y, now)}, as of ${now.raw}`);
-        lines.push(...this.otherCalLines(val('founded'), 'Founded'));
-        if (type === 'nation') lines.push(...this.otherCalLines(val('dissolved'), 'Fell'));
+        const end = p.toPt(val('dissolved'), this.file);
+        if (val('founded') && !y) lines.push(`Can't read "${val('founded')}" as a date.`);
+        if (val('dissolved') && !end) lines.push(`Can't read "${val('dissolved')}" as a date.`);
+        if (y && end) lines.push(`${w.stood} ${fmtNum(p.spanYears(y, end))} years`);
+        const how = String(p.fm(this.file).ended_how || '').trim();
+        if (end && now) lines.push(`${how || w.end} ${p.agoText(end, now)}, as of ${now.raw}`);
+        else if (y && now) lines.push(`${w.start} ${p.agoText(y, now)}, as of ${now.raw}`);
+        lines.push(...this.otherCalLines(val('founded'), w.start));
+        lines.push(...this.otherCalLines(val('dissolved'), w.end));
       } else if (type === 'event') {
         const { start, end } = p.eventSpan(this.file, Object.assign({}, p.fm(this.file), { date: val('date'), end: val('end') }));
         const et = String(val('end') || '').trim();
@@ -10214,6 +11124,22 @@ class EntityView extends ItemView {
 
     if (field.kind === 'holidayDates') { this.holidayDatesControl(parent, field, fm); return; }
 
+    if (field.kind === 'color') {
+      const box = mark(parent.createDiv('ls-swatches'));
+      const cur = isMapColor(String(v || '')) ? String(v) : '';
+      const set = (c) => this.setFm((f) => { if (c) f[key] = c; else delete f[key]; }, true);
+      const auto = box.createEl('button', { cls: 'ls-swatch-btn is-auto' + (cur ? '' : ' is-active'), text: 'Auto', attr: { 'aria-label': `Automatic: ${hashColor(this.file.basename)}, picked from the name` } });
+      auto.addEventListener('click', () => set(''));
+      for (const c of COLORS_ALL) {
+        const b = box.createEl('button', { cls: `ls-swatch-btn ${colorClass(c)}` + (cur === c ? ' is-active' : ''), attr: { 'aria-label': cap(c) } });
+        b.addEventListener('click', () => set(c));
+      }
+      const custom = box.createEl('input', { type: 'color', cls: 'ls-swatch-custom' + (cur.startsWith('#') ? ' is-active' : ''), attr: { 'aria-label': 'Any color' } });
+      custom.value = cur.startsWith('#') ? (cur.length === 4 ? '#' + [...cur.slice(1)].map((x) => x + x).join('') : cur) : '#888888';
+      custom.addEventListener('change', () => set(custom.value));
+      return;
+    }
+
     if (field.kind === 'date') {
       const inp = parent.createEl('input', { type: 'date', cls: 'ls-input' });
       inp.value = isoDate(v);
@@ -10248,7 +11174,15 @@ class EntityView extends ItemView {
       const chip = box.createDiv('ls-chip' + (dest ? '' : ' is-unresolved'));
       chip.createSpan({ text: dest ? dest.basename : linkText(s) });
       if (dest) chip.addEventListener('click', () => p.openEntity(dest));
-      const roleable = dest && ROLE_FIELDS.includes(key) && p.typeOf(this.file) === 'character' && p.typeOf(dest) === 'organization';
+      const myT = p.typeOf(this.file);
+      const roleable = dest && ROLE_FIELDS.includes(key) && myT === 'character' && isGroupType(p.typeOf(dest));
+      const peopleSide = dest && PEOPLE_FIELDS.includes(key) && key !== 'founders' && isGroupType(myT) && p.typeOf(dest) === 'character';
+      if (peopleSide) {
+        const role = p.roleOf(dest, this.file);
+        if (role) chip.createSpan({ cls: 'ls-chip-note', text: role });
+        if (p.memberStatus(dest, this.file) === 'former') chip.addClass('is-former');
+        iconBtn(chip, 'pencil', role ? 'Edit title and years' : 'Set title and years', () => this.editRole(dest, this.file));
+      }
       if (roleable) {
         const role = p.roleOf(this.file, dest);
         if (role) chip.createSpan({ cls: 'ls-chip-note', text: role });
@@ -10280,8 +11214,10 @@ class EntityView extends ItemView {
           after = Object.assign({}, f);
         }, true);
         if (await p.mirrorLink(this.file, key, file, true, after)) this.refreshSoon();
-        if (ROLE_FIELDS.includes(key) && p.typeOf(this.file) === 'character' && p.typeOf(file) === 'organization' && (!p.roleOf(this.file, file) || p.subdivisionsOf(file).length)) {
+        if (ROLE_FIELDS.includes(key) && p.typeOf(this.file) === 'character' && isGroupType(p.typeOf(file)) && (!p.roleOf(this.file, file) || p.subdivisionsOf(file).length)) {
           this.editRole(this.file, file, true);
+        } else if (PEOPLE_FIELDS.includes(key) && key !== 'founders' && isGroupType(p.typeOf(this.file)) && p.typeOf(file) === 'character' && !p.roleOf(file, this.file)) {
+          this.editRole(file, this.file, true);
         }
       }, this.file).open(), 'ls-chip-add');
     }
@@ -11264,6 +12200,7 @@ class PanelView extends ItemView {
   show(f) {
     const t = this.plugin.typeOf(f);
     if (t === 'story') this.go({ page: 'story', path: f.path });
+    else if (t === 'map') this.plugin.openMap(f);
     else if (t && TYPES[t] && !TYPES[t].plain) this.go({ page: 'entry', path: f.path });
     else if (t === 'outline') { const st = this.plugin.storyFor(f); if (st) this.plugin.openOutline(st); }
     else this.plugin.openInMain(f);
@@ -11829,7 +12766,11 @@ class PanelView extends ItemView {
       const neg = p.negEras();
       let extra = null;
       if (type === 'character') extra = ['Age', p.ageText(fm, now, f)];
-      else if (type === 'organization' && now && p.toPt(fm.founded)) extra = ['Founded', cap(p.agoText(fm.founded, now))];
+      else if (FOUNDING[type] && now && (p.toPt(fm.founded, f) || p.toPt(fm.dissolved, f))) {
+        const w = FOUNDING[type];
+        const a = p.toPt(fm.founded, f), b = p.toPt(fm.dissolved, f);
+        extra = b ? [w.end, cap(p.agoText(b, now)) + (a ? `, after ${fmtNum(p.spanYears(a, b))} years` : '')] : [w.start, cap(p.agoText(a, now))];
+      }
       else if (type === 'event' && now) {
         const { start, end } = p.eventSpan(f, fm);
         if (start) extra = ['When', cap(p.agoText(start, now)) + (end ? `, lasted ${p.durationText(start, end)}` : '')];
@@ -11875,6 +12816,19 @@ class PanelView extends ItemView {
           chip.createSpan({ text: it.file.basename });
           if (it.role) chip.createSpan({ cls: 'ls-chip-note', text: it.role });
           chip.addEventListener('click', () => this.show(it.file));
+        }
+      }
+    }
+
+    if (FOUNDING[type]) {
+      const hist = p.historyOf(f);
+      if (hist.length) {
+        const hb = this.sec(body, 'Through history', { color: def.color, count: hist.length });
+        const dl = hb.createDiv('ls-pv-fields');
+        for (const c of hist) {
+          const r = dl.createDiv('ls-pv-field');
+          r.createDiv({ cls: 'ls-pv-field-label', text: c.pt ? p.yearOf(c.pt) : (c.when || 'No date') });
+          r.createDiv({ cls: 'ls-pv-field-value', text: [p.changeText(f, c), c.k === CHANGE_OTHER ? '' : c.note].filter(Boolean).join(', ') });
         }
       }
     }
@@ -12153,13 +13107,14 @@ class WebView extends ItemView {
         const own = fd ? (SINGULAR[fd.label] || fd.label) : e.field;
         let back2 = inv ? inv.one : `${own} of`;
         let mine = own;
-        if (n.type === 'character' && o.type === 'organization' && ROLE_FIELDS.includes(e.field)) back2 = p.roleOf(n.file, o.file) || back2;
-        if (n.type === 'organization' && o.type === 'character' && ['members', 'leaders', 'founders'].includes(e.field)) mine = p.roleOf(o.file, n.file) || own;
+        if (n.type === 'character' && isGroupType(o.type) && ROLE_FIELDS.includes(e.field)) back2 = p.roleOf(n.file, o.file) || back2;
+        if (isGroupType(n.type) && o.type === 'character' && PEOPLE_FIELDS.includes(e.field)) mine = p.roleOf(o.file, n.file) || own;
         const ed = add(n, o, FIELD_EDGE[e.field] || 'other', mine, back2);
         if (ed) {
           const chr = n.type === 'character' ? n.file : o.type === 'character' ? o.file : null;
-          const grp = n.type === 'organization' ? n.file : o.type === 'organization' ? o.file : null;
-          if (chr && grp) ed.former = p.memberStatus(chr, grp) === 'former';
+          const grp = isGroupType(n.type) ? n.file : isGroupType(o.type) ? o.file : null;
+          const tie = ROLE_FIELDS.includes(e.field) || PEOPLE_FIELDS.includes(e.field);
+          if (chr && grp && (tie || n.type === 'organization' || o.type === 'organization')) ed.former = p.memberStatus(chr, grp) === 'former';
         }
       }
     }
@@ -12900,6 +13855,14 @@ class RolesModal extends Modal {
         for (const w of ['Friend', 'Best friend', 'Ally', 'Enemy', 'Nemesis', 'Rival', 'Mentor', 'Student', 'Lover', 'Partner', 'Fiancé', 'Fiancée', 'Wife', 'Husband', 'Spouse', 'Brother, estranged', 'Sister, estranged']) dl.createEl('option', { value: w });
       }
     }
+    /* The group's ranks, offered as titles. */
+    this.rankList = this.isTie || p.typeOf(this.org) !== 'organization' ? [] : p.ranksOf(this.org).list;
+    if (this.rankList.length) {
+      this.rankListId = `ls-ranks-${Math.random().toString(36).slice(2, 8)}`;
+      const dl = contentEl.createEl('datalist', { attr: { id: this.rankListId } });
+      for (const r of this.rankList) dl.createEl('option', { value: r.split('/')[0].trim() });
+      contentEl.createDiv({ cls: 'ls-hint ls-role-ranks', text: `Ranks, highest first: ${this.rankList.map((r) => r.split('/')[0].trim()).join(' › ')}` });
+    }
     const subs = this.isTie ? [] : p.allSubdivisions(this.org);
     if (subs.length) {
       if (!this.subSel) this.subSel = new Set(subs.map((x) => x.org).filter((o) => p.inGroup(this.ch, o)));
@@ -12930,8 +13893,11 @@ class RolesModal extends Modal {
         el.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.save(); });
         return el;
       };
-      const ti = inp('title', this.isTie ? (i === 0 ? 'Enemy' : 'Friend') : i === 0 ? 'Student, 5th year' : 'Professor, Potions');
+      const ot = p.typeOf(this.org);
+      const ph = { nation: ['Queen', 'Regent'], settlement: ['Mayor', 'Reeve'], location: ['Commander', 'Castellan'] }[ot] || ['Student, 5th year', 'Professor, Potions'];
+      const ti = inp('title', this.isTie ? (i === 0 ? 'Enemy' : 'Friend') : ph[i === 0 ? 0 : 1]);
       if (this.isTie) ti.setAttr('list', 'ls-tie-words');
+      else if (this.rankList && this.rankList.length) ti.setAttr('list', this.rankListId);
       if (!first) first = ti;
       inp('start', 'From');
       inp('end', 'To');
@@ -12965,6 +13931,68 @@ class RolesModal extends Modal {
     await this.plugin.setRoles(this.ch, this.org, this.rows, this.field);
     if (this.subSel) await this.plugin.setSubdivisions(this.ch, this.org, this.subSel);
     if (this.onDone) this.onDone();
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
+/* Edits a place's or group's dated changes: one row each, with its date, what happened, who or what it involved, and a note. */
+class ChangesModal extends Modal {
+  constructor(app, plugin, file, onDone) { super(app); this.plugin = plugin; this.file = file; this.onDone = onDone; }
+  onOpen() {
+    const p = this.plugin;
+    this.titleEl.setText(`${this.file.basename} through history`);
+    this.modalEl.addClass('ls-changes-modal');
+    this.rows = p.historyOf(this.file).map((c) => ({ kind: c.kind, when: c.when, from: c.from, target: c.target, note: c.note }));
+    if (!this.rows.length) this.rows.push({ kind: 'renamed', when: '', from: '', target: '', note: '' });
+    this.draw();
+  }
+  draw() {
+    const p = this.plugin;
+    const el = this.contentEl;
+    el.empty();
+    el.addClass('ls-changes');
+    const field = HOLDER_FIELD[p.typeOf(this.file)];
+    el.createEl('p', { cls: 'ls-muted', text: `One line per change, in any order; they're sorted by date when you save. Dates can be written in any calendar. ${field ? 'Whoever holds it as of the present date is written into its ' + (field === 'nation' ? 'Nation' : 'Part of') + ' field, so lists elsewhere stay right.' : ''}` });
+    const list = el.createDiv('ls-changes-rows');
+    const holderTypes = ['nation', 'organization', 'character', 'settlement', 'region', 'culture'];
+    this.rows.forEach((r, i) => {
+      const k = CHANGE_KINDS.find((x) => x.key === r.kind) || CHANGE_OTHER;
+      const row = list.createDiv('ls-changes-row');
+      const top = row.createDiv('ls-changes-line');
+      const when = top.createEl('input', { type: 'text', cls: 'ls-input ls-changes-when', attr: { placeholder: 'When', 'aria-label': 'When' } });
+      when.value = r.when;
+      when.addEventListener('input', () => { r.when = when.value; });
+      const sel = top.createEl('select', { cls: 'dropdown', attr: { 'aria-label': 'What happened' } });
+      for (const ck of CHANGE_KINDS) sel.createEl('option', { text: ck.label, value: ck.key });
+      sel.value = k.key;
+      sel.addEventListener('change', () => { r.kind = sel.value; this.draw(); });
+      iconBtn(top, 'x', 'Remove this change', () => { this.rows.splice(i, 1); this.draw(); });
+
+      const box = row.createDiv('ls-changes-line');
+      const input = (key, ph, pick) => {
+        const w = box.createDiv('ls-changes-field');
+        const x = w.createEl('input', { type: 'text', cls: 'ls-input', attr: { placeholder: ph, 'aria-label': ph } });
+        x.value = r[key] || '';
+        x.addEventListener('input', () => { r[key] = x.value; });
+        if (pick) iconBtn(w, 'link', `Choose ${ph.toLowerCase()}`, () => new EntitySuggest(this.app, p, holderTypes, (f) => { r[key] = p.linkTo(f, this.file); this.draw(); }, this.file).open());
+      };
+      if (k.act === 'name') { input('from', 'Was called (optional)'); input('target', 'New name'); }
+      else if (k.act === 'hands') { input('from', 'From (optional)', true); input('target', k.link === 'by' ? 'Taken by' : 'Given to', true); }
+      else if (k.link) input('target', k.act === 'back' ? 'By (optional)' : 'By whom (optional)', true);
+      input('note', k === CHANGE_OTHER ? 'What happened' : 'Note (optional)');
+    });
+    const more = textBtn(el, 'Add a change', () => { this.rows.push({ kind: 'conquered', when: '', from: '', target: '', note: '' }); this.draw(); }, 'ls-chip-add');
+    setIcon(more.createSpan({ cls: 'ls-btn-icon' }), 'plus');
+    more.prepend(more.lastChild);
+    const a = el.createDiv('ls-modal-actions');
+    textBtn(a, 'Cancel', () => this.close());
+    textBtn(a, 'Save', async () => {
+      if (this.busy) return;
+      this.busy = true;
+      this.close();
+      await p.saveChanges(this.file, this.rows);
+      if (this.onDone) this.onDone();
+    }, 'mod-cta');
   }
   onClose() { this.contentEl.empty(); }
 }
@@ -13427,7 +14455,7 @@ class CalendarEditorModal extends Modal {
     textBtn(addRow, 'Add an earlier era', () => { s.eras.unshift({ name: '', short: '', len: '', mode: 'down', num: '1', fmt: '' }); this.draw(); }, 'ls-chip-add');
     textBtn(addRow, 'Add a later era', () => { const last = s.eras[s.eras.length - 1]; if (last && !last.len) last.len = s.eraRepeat || '100'; s.eras.push({ name: '', short: '', len: '', mode: 'up', num: '1', fmt: '' }); this.draw(); }, 'ls-chip-add');
     const og = er.createDiv('ls-ce-row');
-    field(og, 'Then keep adding eras of (years)', s.eraRepeat, (v) => { s.eraRepeat = v; }, { placeholder: 'No', type: 'number' });
+    field(og, 'Then keep adding eras of (years)', s.eraRepeat, (v) => { s.eraRepeat = v; }, { placeholder: 'Same as the last era', type: 'number' });
     field(og, 'Eras are called', s.eraWord, (v) => { s.eraWord = v; }, { placeholder: 'Age' });
     const dw = og.createEl('label', { cls: 'ls-ce-field' });
     dw.createSpan({ cls: 'ls-ce-label', text: 'Years are written' });
@@ -13906,5 +14934,1162 @@ for (const m of ['renderWriting', 'kindChips', 'statGrid', 'ring', 'lineChart', 
   PanelView.prototype[m] = OverviewView.prototype[m];
 }
 PanelView.prototype.compact = true;
+
+/* ------------------------------------------------------------------ */
+/* Maps                                                                */
+/* ------------------------------------------------------------------ */
+
+/* What can be pinned or drawn on a map: any entry, and other maps (a city's own map, say). */
+const MAP_TARGETS = [...ANY, 'map', 'holiday'];
+/* Pins whose names always show; the rest show once you zoom in. */
+const MAP_MAJOR = new Set(['nation', 'region', 'settlement', 'map']);
+const MAP_COLOR_VAR = { red: '--color-red', orange: '--color-orange', yellow: '--color-yellow', green: '--color-green', cyan: '--color-cyan', blue: '--color-blue', purple: '--color-purple', pink: '--color-pink' };
+
+/* A small crop of a map around one pin or area, for entry pages. */
+function mapThumb(parent, plugin, h) {
+  const A = h.data.aspect || 1.5;
+  const W = 1000 * A, H = 1000;
+  let x0, y0, x1, y1;
+  if (h.kind === 'pin') {
+    const cx = h.item.x * W, cy = h.item.y * H, r = 160;
+    x0 = cx - r * 1.6; x1 = cx + r * 1.6; y0 = cy - r; y1 = cy + r;
+  } else {
+    const xs = h.item.pts.map((q) => q[0] * W), ys = h.item.pts.map((q) => q[1] * H);
+    x0 = Math.min(...xs); x1 = Math.max(...xs); y0 = Math.min(...ys); y1 = Math.max(...ys);
+    const pw = Math.max(80, (x1 - x0) * 0.2), ph = Math.max(50, (y1 - y0) * 0.2);
+    x0 -= pw; x1 += pw; y0 -= ph; y1 += ph;
+  }
+  /* Keep the crop 16:10. */
+  const want = 1.6;
+  let w = x1 - x0, hh = y1 - y0;
+  if (w / hh < want) { const nw = hh * want; x0 -= (nw - w) / 2; w = nw; } else { const nh = w / want; y0 -= (nh - hh) / 2; hh = nh; }
+  const svg = svgEl('svg', { class: 'ls-onmap-svg', viewBox: `${x0} ${y0} ${w} ${hh}`, preserveAspectRatio: 'xMidYMid slice', role: 'img', 'aria-label': h.map.basename }, parent);
+  svgEl('rect', { x: x0, y: y0, width: w, height: hh, class: 'ls-onmap-bg' }, svg);
+  if (h.data.image) svgEl('image', { href: plugin.app.vault.getResourcePath(h.data.image), x: 0, y: 0, width: W, height: H, preserveAspectRatio: 'none' }, svg);
+  const tf = plugin.resolveLink(h.item.target, h.map);
+  const color = tf ? plugin.mapColorOf(tf, h.item, h.data.areas, h.map) : h.item.color || (h.kind === 'area' ? hashColor(linkText(h.item.target)) : 'base');
+  const g = svgEl('g', { class: colorClass(color), style: colorStyle(color) }, svg);
+  if (h.kind === 'pin') {
+    const style = tf ? plugin.mapStyle(plugin.mapStyleKey(tf), plugin.typeOf(tf)) : defaultMapStyle('', null);
+    const r = MAP_MARKER_R[style.size] || 6;
+    const mg = svgEl('g', { class: 'ls-onmap-marker', transform: `translate(${h.item.x * W},${h.item.y * H}) scale(${(w * 0.03) / r})` }, g);
+    drawMapMarker(mg, style);
+  } else {
+    svgEl('polygon', { points: h.item.pts.map((q) => `${q[0] * W},${q[1] * H}`).join(' '), class: 'ls-onmap-area' }, g);
+  }
+  return svg;
+}
+
+/* A marker drawn small, for keys and pickers. */
+function mapMarkerPreview(parent, style, color) {
+  const svg = svgEl('svg', { class: `ls-map-preview ${colorClass(color || 'base')}`, style: colorStyle(color), viewBox: '-13 -13 26 26', 'aria-hidden': 'true' }, parent);
+  drawMapMarker(svgEl('g', { class: 'ls-map-pin' }, svg), style);
+  return svg;
+}
+
+/* "Map key": how each type of place is drawn on every map. */
+class MapKeyModal extends Modal {
+  constructor(app, plugin, view, focus) { super(app); this.plugin = plugin; this.view = view; this.focus = focus || null; }
+  keys() {
+    const p = this.plugin;
+    const onMap = new Map();
+    this.types = new Map([['@capital', 'settlement']]);
+    if (this.view) {
+      for (const pin of this.view.d.pins) {
+        const inf = this.view.info(pin);
+        const k = this.view.pinStyle(inf).key;
+        onMap.set(k, (onMap.get(k) || 0) + 1);
+        if (inf.type && !this.types.has(k)) this.types.set(k, inf.type);
+      }
+    }
+    const all = new Set([...onMap.keys(), '@capital']);
+    const idx = p.index();
+    for (const t of ['settlement', 'location']) for (const f of idx[t]) { const k = p.mapStyleKey(f); all.add(k); if (!this.types.has(k)) this.types.set(k, t); }
+    for (const k of Object.keys(p.settings.mapStyles)) all.add(k);
+    if (this.focus) all.add(this.focus);
+    return [...all].map((k) => ({ key: k, n: onMap.get(k) || 0 }))
+      .sort((a, b) => (b.n > 0) - (a.n > 0) || (a.key.startsWith('@') - b.key.startsWith('@')) || natural(p.mapStyleLabel(a.key), p.mapStyleLabel(b.key)));
+  }
+  onOpen() {
+    this.titleEl.setText('Map key');
+    this.modalEl.addClass('ls-mapkey-modal');
+    this.draw();
+  }
+  draw() {
+    const p = this.plugin;
+    const el = this.contentEl;
+    el.empty();
+    el.addClass('ls-mapkey');
+    el.createDiv({ cls: 'ls-hint', text: 'How each type of place is drawn, on every map in your vault. A place takes its Type ("Port Town", "Capital City"). A settlement a nation names as its Capital gets the capitals line. Pins of places in a nation are drawn in the nation\'s Map color.' });
+    const list = el.createDiv('ls-mapkey-list');
+    let focusRow = null;
+    for (const { key, n } of this.keys()) {
+      const st = p.mapStyle(key, this.types.get(key));
+      const row = list.createDiv('ls-mapkey-row' + (key === this.focus ? ' is-focus' : '') + (st.custom ? ' is-custom' : ''));
+      if (key === this.focus) focusRow = row;
+      const prev = row.createDiv('ls-mapkey-preview');
+      const paint = () => { prev.empty(); mapMarkerPreview(prev, st, 'cyan'); };
+      paint();
+      const name = row.createDiv('ls-mapkey-name');
+      name.createDiv({ text: p.mapStyleLabel(key) });
+      name.createDiv({ cls: 'ls-muted', text: [n ? `${n} on this map` : '', st.custom ? '' : 'default'].filter(Boolean).join(' · ') });
+      const ctl = row.createDiv('ls-mapkey-controls');
+      const save = () => { p.setMapStyle(key, st); paint(); row.addClass('is-custom'); };
+      const select = (opts, k, label) => {
+        const sel = ctl.createEl('select', { cls: 'dropdown', attr: { 'aria-label': label } });
+        for (const [v, l] of opts) sel.createEl('option', { text: l, value: v });
+        sel.value = st[k];
+        sel.addEventListener('change', () => { st[k] = sel.value; save(); });
+      };
+      select(MAP_MARKERS, 'marker', 'Marker');
+      select(MAP_SIZES, 'size', 'Size');
+      select(MAP_LABELS, 'label', 'Label');
+      const far = ctl.createEl('label', { cls: 'ls-ce-check', attr: { 'aria-label': 'Show the name when zoomed out' } });
+      const cb = far.createEl('input', { type: 'checkbox' });
+      cb.checked = !!st.far;
+      far.createSpan({ text: 'Name when zoomed out' });
+      cb.addEventListener('change', () => { st.far = cb.checked; save(); });
+      if (st.custom) iconBtn(ctl, 'rotate-ccw', 'Back to the default', async () => { await p.setMapStyle(key, null); this.draw(); });
+    }
+    if (focusRow) window.setTimeout(() => focusRow.scrollIntoView({ block: 'center' }), 30);
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
+/* Any color, for an area or a nation. */
+class ColorModal extends Modal {
+  constructor(app, current, onPick) { super(app); this.current = current; this.onPick = onPick; }
+  onOpen() {
+    this.titleEl.setText('Custom color');
+    const row = this.contentEl.createDiv('ls-ce-row');
+    const inp = row.createEl('input', { type: 'color', cls: 'ls-swatch-custom is-big' });
+    const c = String(this.current || '');
+    inp.value = /^#[0-9a-f]{6}$/i.test(c) ? c : /^#[0-9a-f]{3}$/i.test(c) ? '#' + [...c.slice(1)].map((x) => x + x).join('') : '#3a7bd5';
+    const hex = row.createEl('input', { type: 'text', cls: 'ls-input', attr: { 'aria-label': 'Hex color', placeholder: '#3a7bd5' } });
+    hex.value = inp.value;
+    inp.addEventListener('input', () => { hex.value = inp.value; });
+    hex.addEventListener('input', () => { if (isMapColor(hex.value.trim()) && hex.value.trim().startsWith('#')) inp.value = hex.value.trim().length === 4 ? '#' + [...hex.value.trim().slice(1)].map((x) => x + x).join('') : hex.value.trim(); });
+    const a = this.contentEl.createDiv('ls-modal-actions');
+    textBtn(a, 'Cancel', () => this.close());
+    textBtn(a, 'Use this color', () => {
+      const v = hex.value.trim().toLowerCase();
+      if (!isMapColor(v) || !v.startsWith('#')) { new Notice('Write the color as # and six hex digits, like #3a7bd5.'); return; }
+      this.close();
+      this.onPick(v);
+    }, 'mod-cta');
+  }
+  onClose() { this.contentEl.empty(); }
+}
+
+class MapView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.file = null;
+    this.d = { pins: [], areas: [], labels: [], image: null };
+    this.W = 1000; this.H = 1000;
+    this.vp = { x: 0, y: 0, k: 1 };
+    this.fitK = 1;
+    this.mode = 'select';
+    this.draft = [];
+    this.sel = null;
+    this.hidden = new Set();
+    this.pointers = new Map();
+    this.inv = [];
+    this.selfWrite = 0;
+    this.pending = {};
+    this.tcache = new Map();
+    this.timeOn = false;
+    this.byHolder = true;
+    this.year = null;
+    this.saveSoon = debounce(() => this.flush(), 500, true);
+  }
+  getViewType() { return VIEW_MAP; }
+  getDisplayText() { return this.file ? this.file.basename : 'Map'; }
+  getIcon() { return 'map'; }
+  getState() { return { file: this.file ? this.file.path : null }; }
+  async setState(state, result) {
+    const f = state && state.file ? this.app.vault.getAbstractFileByPath(state.file) : null;
+    const changed = f instanceof TFile && f !== this.file;
+    if (this.loaded) await this.flush();
+    if (f instanceof TFile) this.file = f;
+    this.pending = { focus: state && state.focus, place: state && state.place, draw: state && state.draw };
+    await super.setState(state, result);
+    await this.load(changed || !this.loaded);
+  }
+  async onOpen() {
+    this.contentEl.addClass('ls-host');
+    this.registerEvent(this.app.metadataCache.on('changed', (f) => {
+      if (f === this.file && Date.now() > this.selfWrite && !this.dragging) this.load(false);
+      else if (this.loaded && f !== this.file && this.d.pins.concat(this.d.areas).some((x) => this.plugin.resolveLink(x.target, this.file) === f)) { this.tcache.clear(); this._bounds = null; this.drawFeatures(); this.renderCard(); }
+    }));
+    this.registerEvent(this.app.vault.on('rename', (f) => { if (f === this.file) this.leaf.updateHeader && this.leaf.updateHeader(); }));
+    this.registerEvent(this.app.vault.on('delete', (f) => { if (f === this.file) this.leaf.detach(); }));
+    this.registerDomEvent(this.contentEl, 'keydown', (e) => this.onKey(e));
+  }
+  async onClose() { this.stopPlay(); await this.flush(); }
+  onResize() { if (this.loaded && !this.fitted) this.fit(); }
+
+  /* ---------- loading and saving ---------- */
+
+  async load(refit) {
+    const p = this.plugin;
+    if (!this.file) return;
+    const d = p.mapData(this.file);
+    const clone = (a) => a.map((x) => Object.assign({}, x, x.pts ? { pts: x.pts.map((q) => q.slice()) } : {}));
+    const imgChanged = !this.d.image || !d.image || this.d.image.path !== d.image.path;
+    this.d = { image: d.image, aspect: d.aspect, pins: clone(d.pins), areas: clone(d.areas), labels: clone(d.labels) };
+    for (const it of [...this.d.pins, ...this.d.areas, ...this.d.labels]) this.applyRange(it);
+    this.tcache.clear();
+    this._bounds = null;
+    const now = p.latestPresent();
+    this.presentG = now ? p.gOf(now) : null;
+    if (d.image && (imgChanged || refit)) {
+      const [w, h] = await this.imageSize(this.app.vault.getResourcePath(d.image));
+      this.W = w; this.H = h;
+      if (Math.abs(w / h - d.aspect) > 0.001 || !this.plugin.fm(this.file).aspect) { this.d.aspect = w / h; this.saveSoon(); }
+    } else if (!d.image) { this.H = 1000; this.W = 1000 * d.aspect; }
+    if (this.sel && !this.listOf(this.sel.kind)[this.sel.i]) this.sel = null;
+    this.render();
+    if (refit || imgChanged) { this.fitted = false; this.fit(); }
+    this.loaded = true;
+    this.applyPending();
+  }
+  imageSize(src) {
+    return new Promise((res) => {
+      const im = new Image();
+      im.onload = () => res([im.naturalWidth || 1000, im.naturalHeight || 1000]);
+      im.onerror = () => res([1000, 1000]);
+      im.src = src;
+    });
+  }
+  async flush() {
+    if (!this.file || !this.loaded) return;
+    this.selfWrite = Date.now() + 1500;
+    await this.plugin.saveMap(this.file, Object.assign({}, this.d, { aspect: this.W / this.H }));
+  }
+  changed() {
+    const was = this._bounds ? this._bounds.join() : '';
+    this._bounds = null;
+    if (this.timeOn && this.bounds().join() !== was) this.renderBar();
+    this.drawFeatures();
+    this.renderCard();
+    this.saveSoon();
+  }
+  listOf(kind) { return kind === 'pin' ? this.d.pins : kind === 'area' ? this.d.areas : this.d.labels; }
+
+  /* What a pin or area points at: { file, type, name, color, missing }. */
+  info(item) {
+    const p = this.plugin;
+    const t = String(item.target || '');
+    if (!t) return { file: null, type: null, name: 'Unnamed', color: item.color || 'base', unnamed: true };
+    if (/^\[\[/.test(t)) {
+      const f = p.resolveLink(t, this.file);
+      const type = f ? p.typeOf(f) : null;
+      const name = f ? f.basename : linkText(t);
+      const color = f ? p.mapColorOf(f, item, this.d.areas, this.file) : item.color || (item.pts ? hashColor(name) : 'base');
+      return { file: f, type, name, color, missing: !f, kind: f ? String(toArr(p.fm(f).kind)[0] || '') : '' };
+    }
+    return { file: null, type: null, name: t, color: item.color || (item.pts ? hashColor(t) : 'base') };
+  }
+  isHidden(inf) { return this.hidden.has(inf.type || 'other'); }
+
+  /* ---------- shell ---------- */
+
+  render() {
+    const p = this.plugin;
+    const root = this.contentEl;
+    root.empty();
+    const wrap = root.createDiv('ls-root ls-map ls-c-green');
+    this.barEl = wrap.createDiv('ls-map-bar');
+    this.canvasEl = wrap.createDiv({ cls: 'ls-map-canvas', attr: { tabindex: '0' } });
+    this.inv = [];
+    if (!this.d.image) {
+      const e = this.canvasEl.createDiv('ls-empty ls-map-empty');
+      setIcon(e.createSpan('ls-empty-icon'), 'map');
+      e.createEl('strong', { text: 'Choose the image for this map' });
+      e.createSpan({ text: 'A world map, a city plan, a floor plan: any picture. Pins and areas are stored as positions on it, so you can swap in a better drawing later without losing them.' });
+      const row = e.createDiv('ls-map-empty-row');
+      textBtn(row, 'Upload an image', () => this.upload(), 'mod-cta');
+      textBtn(row, 'Choose from vault', () => new ImageSuggest(this.app, (f) => this.setImage(f)).open());
+      this.renderBar();
+      return;
+    }
+    this.svg = svgEl('svg', { class: 'ls-map-svg', role: 'application', 'aria-label': `${this.file.basename}. Drag to move, scroll or pinch to zoom.` }, this.canvasEl);
+    this.gView = svgEl('g', {}, this.svg);
+    svgEl('image', { href: this.app.vault.getResourcePath(this.d.image), x: 0, y: 0, width: this.W, height: this.H, preserveAspectRatio: 'none', class: 'ls-map-image' }, this.gView);
+    this.gAreas = svgEl('g', { class: 'ls-map-areas' }, this.gView);
+    this.gAreaLabels = svgEl('g', { class: 'ls-map-area-labels' }, this.gView);
+    this.gPins = svgEl('g', { class: 'ls-map-pins' }, this.gView);
+    this.gLabels = svgEl('g', { class: 'ls-map-labels' }, this.gView);
+    this.gEdit = svgEl('g', { class: 'ls-map-edit' }, this.gView);
+    this.hintEl = this.canvasEl.createDiv('ls-map-hint');
+    this.cardEl = this.canvasEl.createDiv('ls-web-card ls-map-card');
+    this.legendEl = this.canvasEl.createDiv('ls-map-legend');
+    this.bindPointer();
+    this.renderBar();
+    this.drawFeatures();
+    this.renderCard();
+    this.apply();
+  }
+
+  renderBar() {
+    const p = this.plugin;
+    const bar = this.barEl;
+    bar.empty();
+    const row = bar.createDiv('ls-map-row');
+    const title = row.createDiv('ls-map-title');
+    title.createSpan({ cls: 'ls-map-name', text: this.file.basename });
+    const of = p.resolveLink(p.fm(this.file).of, this.file);
+    if (of) { const o = title.createSpan({ cls: 'ls-map-of is-link', text: `of ${of.basename}` }); o.addEventListener('click', () => p.openEntity(of)); }
+    if (this.d.image) {
+      const seg = row.createDiv('ls-seg ls-map-modes');
+      for (const [m, ic, l] of [['select', 'mouse-pointer-2', 'Move and select (Esc)'], ['pin', 'map-pin', 'Drop a pin'], ['area', 'pentagon', 'Draw an area'], ['label', 'type', 'Add a label']]) {
+        const b = iconBtn(seg, ic, l, () => this.setMode(this.mode === m ? 'select' : m));
+        if (this.mode === m) b.addClass('is-active');
+      }
+      if (this.mode === 'area' && this.draft.length) {
+        textBtn(row, 'Finish area', () => this.finishArea(), 'mod-cta');
+        iconBtn(row, 'undo-2', 'Remove the last point', () => { this.draft.pop(); this.drawEdit(); this.renderBar(); });
+        iconBtn(row, 'x', 'Cancel this area', () => { this.draft = []; this.setMode('select'); });
+      }
+    }
+    const tools = row.createDiv('ls-web-tools');
+    if (this.d.image) {
+      const find = tools.createEl('input', { type: 'search', cls: 'ls-search', attr: { placeholder: 'Find on map', 'aria-label': 'Find on this map' } });
+      find.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const q = find.value.toLowerCase().trim();
+        if (!q) return;
+        for (const kind of ['area', 'pin', 'label']) {
+          const i = this.listOf(kind).findIndex((x) => (kind === 'label' ? x.target : this.info(x).name).toLowerCase().includes(q));
+          if (i >= 0) { this.focusItem(kind, i); return; }
+        }
+        new Notice(`Nothing on this map matches "${find.value}".`);
+      });
+      const tb = iconBtn(tools, 'history', this.timeOn ? 'Hide the year slider' : 'Through time: a year slider', () => this.setTime(!this.timeOn));
+      if (this.timeOn) tb.addClass('is-active');
+      const kb = iconBtn(tools, 'list', this.legendOn ? 'Hide the map key' : 'Show the map key', () => { this.legendOn = !this.legendOn; this.renderBar(); this.renderLegend(); });
+      if (this.legendOn) kb.addClass('is-active');
+      iconBtn(tools, 'zoom-in', 'Zoom in', () => this.zoomAt(null, null, 1.4));
+      iconBtn(tools, 'zoom-out', 'Zoom out', () => this.zoomAt(null, null, 1 / 1.4));
+      iconBtn(tools, 'maximize', 'Fit to view', () => this.fit());
+    }
+    iconBtn(tools, 'more-vertical', 'Map options', (e) => {
+      const m = new Menu();
+      addMenuItem(m, 'Upload a new image', 'upload', () => this.upload());
+      addMenuItem(m, 'Choose image from vault', 'image', () => new ImageSuggest(this.app, (f) => this.setImage(f)).open());
+      addMenuItem(m, of ? 'Change what it is a map of' : 'Set what it is a map of', 'map', () => new EntitySuggest(this.app, p, PLACES, (f) => this.app.fileManager.processFrontMatter(this.file, (fm) => { fm.of = p.linkTo(f, this.file); }), this.file).open());
+      addMenuItem(m, 'Pin styles for each type of place…', 'shapes', () => new MapKeyModal(this.app, p, this).open());
+      addMenuItem(m, 'Rename map', 'pencil', () => new NameModal(this.app, { title: 'Rename map', initial: this.file.basename, cta: 'Rename' }, (n) => p.renameEntity(this.file, n)).open());
+      addMenuItem(m, 'Open as note', 'file-text', () => p.openNote(this.file));
+      m.addSeparator();
+      addMenuItem(m, 'Delete map', 'trash-2', () => p.confirmDelete(this.file, 'map', () => this.leaf.detach()), true);
+      m.showAtMouseEvent(e);
+    });
+
+    /* The year slider. */
+    this.rangeEl = this.yearEl = null;
+    if (this.d.image && this.timeOn) {
+      const c = this.driver();
+      const [lo, hi] = this.bounds();
+      const tr = bar.createDiv('ls-map-row ls-map-time');
+      if (p.calendars().length > 1) {
+        OverviewView.prototype.calPicker.call({ plugin: p }, tr, 'Years in', c, (cal) => this.setTimeCal(cal === 'auto' ? 'auto' : cal.id), { auto: true, autoOn: this.isAuto() });
+      }
+      iconBtn(tr, this.playing ? 'pause' : 'play', this.playing ? 'Pause' : 'Play through the years', () => this.togglePlay(), 'ls-map-play');
+      tr.createSpan({ cls: 'ls-map-time-end', text: this.fmtY(lo) });
+      const range = tr.createEl('input', { type: 'range', cls: 'ls-map-slider', attr: { min: String(lo), max: String(hi), step: '1', 'aria-label': 'Year' } });
+      range.value = String(this.year);
+      tr.createSpan({ cls: 'ls-map-time-end', text: this.fmtY(hi) });
+      const yt = tr.createEl('input', { type: 'text', cls: 'ls-input ls-map-year', attr: { 'aria-label': 'Go to a year, in any calendar' } });
+      yt.value = this.fmtY(this.year);
+      this.rangeEl = range; this.yearEl = yt;
+      range.addEventListener('input', () => { this.stopPlay(); this.setYear(Number(range.value)); });
+      range.addEventListener('change', () => this.renderBar());
+      yt.addEventListener('change', () => {
+        const pt = p.toPt(yt.value.trim(), this.file);
+        if (!pt) { new Notice(`Can't read "${yt.value}" as a year.`); yt.value = this.fmtY(this.year); return; }
+        const y = p.inCal(pt, c).y;
+        if (y < lo || y > hi) { this._bounds = [Math.min(lo, y), Math.max(hi, y)]; this.year = y; this.renderBar(); this.drawFeatures(); this.renderCard(); return; }
+        this.setYear(y);
+      });
+      if (this.presentG != null) textBtn(tr, 'Present', () => { this.stopPlay(); this.setYear(this.yearOfG(this.presentG)); this.renderBar(); });
+      const hb = textBtn(tr, 'Color by holder', () => { this.byHolder = !this.byHolder; this.renderBar(); this.drawFeatures(); }, 'ls-toggle' + (this.byHolder ? ' is-active' : ''));
+      hb.setAttr('aria-pressed', String(this.byHolder));
+    }
+
+    /* Layers: one chip per kind of thing on the map. */
+    if (this.d.image) {
+      const kinds = new Map();
+      for (const x of [...this.d.pins, ...this.d.areas]) { const t = this.info(x).type || 'other'; kinds.set(t, (kinds.get(t) || 0) + 1); }
+      if (kinds.size > 1 || this.d.labels.length) {
+        const lr = bar.createDiv('ls-map-row ls-map-layers');
+        lr.createSpan({ cls: 'ls-web-row-label', text: 'Show' });
+        const chip = (key, label, color) => {
+          const on = !this.hidden.has(key);
+          const b = textBtn(lr, label, () => { if (on) this.hidden.add(key); else this.hidden.delete(key); this.renderBar(); this.drawFeatures(); }, `ls-toggle ls-c-${color}` + (on ? ' is-active' : ''));
+          b.setAttr('aria-pressed', String(on));
+          b.prepend(createSpan('ls-swatch'));
+        };
+        for (const [t, n] of [...kinds].sort((a, b) => b[1] - a[1])) chip(t, `${t === 'other' ? 'Other' : TYPES[t].plural} (${n})`, t === 'other' ? 'base' : TYPES[t].color);
+        if (this.d.labels.length) chip('labels', `Labels (${this.d.labels.length})`, 'base');
+      }
+    }
+  }
+
+  setMode(m) {
+    this.mode = m;
+    if (m !== 'area') this.draft = [];
+    if (m === 'select') { this.pendingPlace = null; this.pendingDraw = null; }
+    if (this.svg) this.svg.setAttribute('data-mode', m);
+    this.renderBar();
+    this.drawEdit();
+    this.renderHint();
+  }
+  renderHint() {
+    if (!this.hintEl) return;
+    const who = (path) => { const f = path && this.app.vault.getAbstractFileByPath(path); return f ? f.basename : ''; };
+    const t = {
+      pin: this.pendingPlace ? `Tap where ${who(this.pendingPlace)} is.` : 'Tap the map to drop a pin, then choose what it is.',
+      area: this.draft.length >= 3 ? 'Keep tapping to add corners. Tap the first corner, double-tap or press Enter to finish.' : `Tap to place the corners of ${this.pendingDraw ? who(this.pendingDraw) : 'the area'}, one after another.`,
+      label: 'Tap where the label goes.',
+    }[this.mode];
+    this.hintEl.setText(t || '');
+    this.hintEl.toggle(!!t);
+  }
+
+  /* ---------- time ---------- */
+
+  applyRange(it) {
+    const r = this.plugin.mapRange(it.years, this.file);
+    it.gA = r.a; it.gB = r.b; it.badYears = r.bad;
+  }
+  /* The last day of a year of the primary calendar: the slider's day. */
+  /* The calendar the slider counts in: the one picked, or (In use at the time) the primary, with each year
+     shown in the calendar in use then. Same choice as the timeline's until changed here. */
+  timeCalId() { const t = this.plugin.settings.mapTime.cal; return t == null ? (this.plugin.settings.timeline.cal || '') : t; }
+  isAuto() { return this.timeCalId() === 'auto' && this.plugin.calendars().length > 1; }
+  driver() { const p = this.plugin; return this.timeCalId() === 'auto' ? p.primaryCal() : p.calById(this.timeCalId()); }
+  yearG(y) { const c = this.driver(); return c.epoch + c.daysBefore(y) + c.year(y).yearDays - 1; }
+  yearOfG(g) { const c = this.driver(); return c.fromDay(g - c.epoch).y; }
+  /* A year as shown: in the calendar picked, or in the one in use that year. */
+  fmtY(y) {
+    const p = this.plugin;
+    if (!this.isAuto()) return this.driver().yearText(y, null);
+    const G = this.yearG(y);
+    const a = p.calAt(G);
+    const r = a.fromDay(G - a.epoch);
+    return a === p.primaryCal() ? a.yearText(r.y, r.d) : `${a.yearText(r.y, r.d)} (${a.label()})`;
+  }
+  /* A year written so it reads back into the slider's calendar, for a shape's years. */
+  yearLabel(y) {
+    const p = this.plugin;
+    const c = this.driver();
+    const t = c.yearText(y, null);
+    return detectCal(p.world(), t, null).cal === c ? t : `${c.label()}: ${t}`;
+  }
+  /* Switch the slider's calendar, staying on the same day. */
+  async setTimeCal(id) {
+    const p = this.plugin;
+    const G = this.year != null ? this.yearG(this.year) : null;
+    p.settings.mapTime.cal = id;
+    await p.saveSettings();
+    this._bounds = null;
+    if (G != null) this.year = this.yearOfG(G);
+    const [lo, hi] = this.bounds();
+    if (this.year != null) this.year = Math.min(hi, Math.max(lo, this.year));
+    this.renderBar();
+    this.drawFeatures();
+    this.renderCard();
+  }
+  /* How an entry stands over time, worked out once per load: standing, holder and name on any day. */
+  timeInfo(f) {
+    let t = this.tcache.get(f);
+    if (t) return t;
+    const p = this.plugin;
+    const fm = p.fm(f);
+    const sp = p.toPt(fm.founded, f), dp = p.toPt(fm.dissolved, f);
+    const start = sp ? p.gOf(sp) : null, end = dp ? p.gEnd(dp) : null;
+    const hist = FOUNDING[p.typeOf(f)] ? p.historyOf(f) : [];
+    const evs = hist.filter((c) => c.g != null && (c.k.act === 'end' || c.k.act === 'back'));
+    const segs = FOUNDING[p.typeOf(f)] ? p.ownershipOf(f).map((sg) => ({ holder: sg.holder, a: sg.from ? p.gOf(sg.from) : null, b: sg.to ? p.gOf(sg.to) : null })) : [];
+    const lastEnd = (G) => { let e = null; for (const x of evs) if (x.g <= G) e = x.k.act === 'end' ? x : null; return e; };
+    t = {
+      standing: (G) => {
+        if (G == null) return 'standing';
+        if (start != null && G < start) return 'before';
+        if (end != null && G > end) return 'gone';
+        return lastEnd(G) ? 'gone' : 'standing';
+      },
+      goneSince: (G) => { if (end != null && G > end) return { g: end, how: String(fm.ended_how || '').trim() }; const e = lastEnd(G); return e ? { g: e.g, how: e.k.label } : null; },
+      holderAt: (G) => { let h = null; for (const sg of segs) if ((sg.a == null || sg.a <= G) && (sg.b == null || G < sg.b)) h = sg.holder; return h; },
+      nameAt: (G) => p.nameAt(f, G),
+      gs: [start, end, ...hist.map((c) => c.g)].filter((x) => x != null),
+    };
+    this.tcache.set(f, t);
+    return t;
+  }
+  /* How a pin, area or label looks at the slider's year (or the present day when time is off). */
+  look(item, kind) {
+    const inf = kind === 'label' ? { name: item.target, color: 'base', type: 'labels' } : this.info(item);
+    const out = Object.assign({}, inf, { show: kind === 'label' ? !this.hidden.has('labels') : !this.isHidden(inf), gone: false });
+    const G = this.timeOn ? this.yearG(this.year) : this.presentG;
+    if (G != null && ((item.gA != null && G < item.gA) || (item.gB != null && G > item.gB))) out.show = false;
+    if (!this.timeOn || !inf.file || !FOUNDING[inf.type]) return out;
+    const t = this.timeInfo(inf.file);
+    const st = t.standing(G);
+    if (st === 'before') out.show = false;
+    else if (st === 'gone') { if (kind === 'area') out.show = false; else out.gone = true; }
+    out.name = t.nameAt(G);
+    out.holder = t.holderAt(G);
+    if (this.byHolder && out.holder) out.color = this.holderColor(out.holder);
+    return out;
+  }
+  /* A holder's color: its own area's color on this map, or the color its name gives it. */
+  holderColor(h) {
+    if (h.file) return this.plugin.entityColor(h.file, this.d.areas, this.file);
+    return hashColor(h.text);
+  }
+  /* How a pin is drawn: its map key line. */
+  pinStyle(inf) {
+    const p = this.plugin;
+    if (!inf.file) return Object.assign(defaultMapStyle('', null), { key: '@type:other' });
+    return p.mapStyle(p.mapStyleKey(inf.file), inf.type);
+  }
+  /* The slider's range: every dated thing on the map, padded a little. */
+  bounds() {
+    if (this._bounds) return this._bounds;
+    const gs = [];
+    for (const it of [...this.d.pins, ...this.d.areas, ...this.d.labels]) {
+      if (it.gA != null) gs.push(it.gA);
+      if (it.gB != null) gs.push(it.gB);
+      const f = it.target && /^\[\[/.test(it.target) ? this.plugin.resolveLink(it.target, this.file) : null;
+      if (f) gs.push(...this.timeInfo(f).gs);
+    }
+    /* Nothing on the map has a date yet: span the project's whole timeline instead. */
+    if (!gs.length) {
+      try {
+        for (const e of this.plugin.timeline(this.plugin.index(), { births: true, foundings: true, calendar: true })) if (e.g != null) gs.push(e.g);
+      } catch (e) { /* no timeline yet */ }
+    }
+    if (this.presentG != null) gs.push(this.presentG);
+    let lo, hi;
+    if (gs.length) {
+      lo = this.yearOfG(Math.min(...gs)); hi = this.yearOfG(Math.max(...gs));
+      const pad = Math.max(5, Math.round((hi - lo) * 0.04));
+      lo -= pad; hi += pad;
+    } else { lo = 1; hi = 100; }
+    this._bounds = [lo, hi];
+    return this._bounds;
+  }
+  setTime(on) {
+    this.timeOn = on;
+    if (on && this.year == null) {
+      const [lo, hi] = this.bounds();
+      this.year = this.presentG != null ? this.yearOfG(this.presentG) : hi;
+      this.year = Math.min(hi, Math.max(lo, this.year));
+    }
+    if (!on) this.stopPlay();
+    this.renderBar();
+    this.drawFeatures();
+    this.renderCard();
+  }
+  setYear(y) {
+    const [lo, hi] = this.bounds();
+    this.year = Math.min(hi, Math.max(lo, Math.round(y)));
+    if (this.rangeEl) this.rangeEl.value = String(this.year);
+    if (this.yearEl && document.activeElement !== this.yearEl) this.yearEl.value = this.fmtY(this.year);
+    this.drawFeatures();
+    this.renderCard();
+  }
+  togglePlay() {
+    if (this.playing) { this.stopPlay(); this.renderBar(); return; }
+    const [lo, hi] = this.bounds();
+    if (this.year >= hi) this.year = lo;
+    const step = Math.max(1, Math.round((hi - lo) / 160));
+    this.playing = window.setInterval(() => {
+      if (this.year >= hi) { this.stopPlay(); this.renderBar(); return; }
+      this.setYear(this.year + step);
+    }, 90);
+    this.renderBar();
+  }
+  stopPlay() { if (this.playing) window.clearInterval(this.playing); this.playing = null; }
+  /* Years a shape is shown. */
+  editYears(kind, i) {
+    const it = this.listOf(kind)[i];
+    new NameModal(this.app, { title: 'Years shown on the map', placeholder: '900 – 1102, from 1102, until 1200 (empty: always)', initial: it.years || '', cta: 'Save', allowEmpty: true }, (v) => {
+      it.years = oneLine(v).replace(/\|/g, '/');
+      this.applyRange(it);
+      if (it.badYears) new Notice(`Can't read "${it.years}" as years. Write it like "900 – 1102", "from 1102" or "until 1200".`);
+      this._bounds = null;
+      this.renderBar();
+      this.changed();
+    }).open();
+  }
+  /* The border changes at the slider's year: the old shape ends the year before, a copy starts this year. */
+  redrawFrom(i) {
+    const p = this.plugin;
+    const c = this.driver();
+    const old = this.d.areas[i];
+    const r = rangeParts(old.years);
+    const y = this.year;
+    const copy = { target: old.target, pts: old.pts.map((q) => q.slice()), color: old.color, years: rangeText({ from: this.yearLabel(y), to: r.to }) };
+    old.years = rangeText({ from: r.from, to: this.yearLabel(c.prev(y)) });
+    this.applyRange(old);
+    this.applyRange(copy);
+    this.d.areas.splice(i + 1, 0, copy);
+    this.sel = { kind: 'area', i: i + 1 };
+    this.selVertex = null;
+    this.changed();
+    new Notice(`Now reshape it: this shape is shown from ${this.fmtY(y)}, the old one until ${this.fmtY(c.prev(y))}.`);
+  }
+
+  /* ---------- drawing ---------- */
+
+  drawFeatures() {
+    if (!this.svg) return;
+    const W = this.W, H = this.H;
+    for (const g of [this.gAreas, this.gAreaLabels, this.gPins, this.gLabels]) while (g.firstChild) g.removeChild(g.firstChild);
+    this.inv = this.inv.filter((x) => x.edit);
+    const sel = (kind, i) => this.sel && this.sel.kind === kind && this.sel.i === i;
+    this.d.areas.forEach((a, i) => {
+      const inf = this.look(a, 'area');
+      if (!inf.show) return;
+      const g = svgEl('g', { class: `ls-map-area-g ${colorClass(inf.color)}` + (inf.type ? ` is-${inf.type}` : '') + (sel('area', i) ? ' is-selected' : '') + (inf.missing || inf.unnamed ? ' is-missing' : ''), style: colorStyle(inf.color), 'data-kind': 'area', 'data-i': i }, this.gAreas);
+      svgEl('polygon', { class: 'ls-map-area', points: a.pts.map((q) => `${q[0] * W},${q[1] * H}`).join(' ') }, g);
+      const [cx, cy] = polyCentroid(a.pts);
+      const lg = svgEl('g', { class: `ls-map-area-label ${colorClass(inf.color)}` + (inf.type ? ` is-${inf.type}` : ''), style: colorStyle(inf.color), 'data-kind': 'area', 'data-i': i }, this.gAreaLabels);
+      svgEl('text', { 'text-anchor': 'middle', dy: '0.35em' }, lg).textContent = inf.name;
+      this.inv.push({ el: lg, x: cx * W, y: cy * H });
+    });
+    this.d.pins.forEach((pin, i) => {
+      const inf = this.look(pin, 'pin');
+      if (!inf.show) return;
+      const st = this.pinStyle(inf);
+      const g = svgEl('g', {
+        class: `ls-map-pin ${colorClass(inf.color)} is-${st.size} lbl-${st.label}` + (st.far ? '' : ' is-minor') + (inf.gone ? ' is-gone' : '') + (sel('pin', i) ? ' is-selected' : '') + (inf.missing || inf.unnamed ? ' is-missing' : ''),
+        style: colorStyle(inf.color), 'data-kind': 'pin', 'data-i': i, tabindex: '0', role: 'button', 'aria-label': inf.name,
+      }, this.gPins);
+      const r = drawMapMarker(g, st);
+      const text = st.label === 'type' && inf.kind ? `${inf.name} (${inf.kind})` : inf.name;
+      svgEl('text', { class: 'ls-map-pin-label', y: -(r + 6), 'text-anchor': 'middle' }, g).textContent = text;
+      this.inv.push({ el: g, x: pin.x * W, y: pin.y * H });
+    });
+    if (!this.hidden.has('labels')) {
+      this.d.labels.forEach((l, i) => {
+        if (!this.look(l, 'label').show) return;
+        const g = svgEl('g', { class: 'ls-map-label' + (sel('label', i) ? ' is-selected' : ''), 'data-kind': 'label', 'data-i': i }, this.gLabels);
+        svgEl('text', { 'text-anchor': 'middle', dy: '0.35em' }, g).textContent = l.target;
+        this.inv.push({ el: g, x: l.x * W, y: l.y * H });
+      });
+    }
+    this.drawEdit();
+    this.renderLegend();
+  }
+  /* The map key: a line for each kind of pin shown, and a swatch for each nation. */
+  renderLegend() {
+    const el = this.legendEl;
+    if (!el) return;
+    el.empty();
+    el.toggle(!!this.legendOn);
+    if (!this.legendOn) return;
+    const p = this.plugin;
+    const styles = new Map();
+    const nations = new Map();
+    const addNation = (f) => { if (f && !nations.has(f)) nations.set(f, p.entityColor(f, this.d.areas, this.file)); };
+    for (const pin of this.d.pins) {
+      const inf = this.look(pin, 'pin');
+      if (!inf.show) continue;
+      const st = this.pinStyle(inf);
+      if (!styles.has(st.key)) styles.set(st.key, { st, n: 0 });
+      styles.get(st.key).n++;
+      if (inf.file) addNation(p.nationOf(inf.file));
+    }
+    for (const a of this.d.areas) {
+      const inf = this.look(a, 'area');
+      if (inf.show && inf.type === 'nation') addNation(inf.file);
+    }
+    const head = el.createDiv('ls-map-legend-head');
+    head.createSpan({ cls: 'ls-map-legend-title', text: 'Key' });
+    iconBtn(head, 'pencil', 'Choose how each type of place is drawn', () => new MapKeyModal(this.app, p, this).open());
+    if (!styles.size && !nations.size) el.createDiv({ cls: 'ls-muted', text: 'Nothing pinned yet.' });
+    for (const { st, n } of [...styles.values()].sort((a, b) => b.n - a.n)) {
+      const row = el.createDiv({ cls: 'ls-map-legend-row is-link', attr: { 'aria-label': `${n} on this map. Click to change how it is drawn.` } });
+      mapMarkerPreview(row, st);
+      row.createSpan({ text: p.mapStyleLabel(st.key) });
+      row.addEventListener('click', () => new MapKeyModal(this.app, p, this, st.key).open());
+    }
+    if (nations.size) {
+      el.createDiv({ cls: 'ls-map-legend-sub', text: 'Nations' });
+      for (const [f, c] of [...nations].sort((a, b) => natural(a[0].basename, b[0].basename))) {
+        const row = el.createDiv({ cls: `ls-map-legend-row is-link ${colorClass(c)}`, attr: { style: colorStyle(c) } });
+        row.createSpan('ls-map-legend-swatch');
+        row.createSpan({ text: f.basename });
+        row.addEventListener('click', () => p.openEntity(f));
+      }
+    }
+  }
+  /* Corner handles of the selected area, and the area being drawn. */
+  drawEdit() {
+    if (!this.gEdit) return;
+    const g = this.gEdit;
+    while (g.firstChild) g.removeChild(g.firstChild);
+    this.inv = this.inv.filter((x) => !x.edit);
+    const W = this.W, H = this.H;
+    const handle = (x, y, cls, attrs) => {
+      const h = svgEl('g', Object.assign({ class: cls }, attrs), g);
+      svgEl('circle', { r: cls.includes('is-mid') ? 4.5 : 6.5 }, h);
+      this.inv.push({ el: h, x, y, edit: true });
+    };
+    if (this.sel && this.sel.kind === 'area' && this.mode === 'select') {
+      const a = this.d.areas[this.sel.i];
+      if (a) {
+        a.pts.forEach((q, j) => {
+          const n = a.pts[(j + 1) % a.pts.length];
+          handle(((q[0] + n[0]) / 2) * W, ((q[1] + n[1]) / 2) * H, 'ls-map-handle is-mid', { 'data-kind': 'mid', 'data-i': j });
+        });
+        a.pts.forEach((q, j) => handle(q[0] * W, q[1] * H, 'ls-map-handle' + (this.selVertex === j ? ' is-active' : ''), { 'data-kind': 'vertex', 'data-i': j }));
+      }
+    }
+    if (this.mode === 'area' && this.draft.length) {
+      svgEl('polyline', { class: 'ls-map-draft', points: this.draft.map((q) => `${q[0] * W},${q[1] * H}`).join(' ') }, g);
+      this.draft.forEach((q, j) => handle(q[0] * W, q[1] * H, 'ls-map-handle is-draft' + (j === 0 && this.draft.length >= 3 ? ' is-first' : ''), { 'data-kind': j === 0 ? 'first' : 'draft' }));
+    }
+    this.apply();
+  }
+
+  apply() {
+    if (!this.gView) return;
+    const v = this.vp;
+    this.gView.setAttribute('transform', `translate(${v.x},${v.y}) scale(${v.k})`);
+    const s = 1 / v.k;
+    for (const it of this.inv) it.el.setAttribute('transform', `translate(${it.x},${it.y}) scale(${s})`);
+    this.svg.classList.toggle('is-far', v.k < this.fitK * 1.8);
+    this.svg.classList.toggle('is-time', !!this.timeOn);
+  }
+  size() {
+    const r = this.canvasEl.getBoundingClientRect();
+    return { w: r.width, h: r.height, left: r.left, top: r.top };
+  }
+  fit() {
+    const { w, h } = this.size();
+    if (!w || !h || !this.svg) return;
+    const k = Math.min(w / this.W, h / this.H) * 0.96;
+    this.fitK = k;
+    this.vp = { k, x: (w - this.W * k) / 2, y: (h - this.H * k) / 2 };
+    this.fitted = true;
+    this.apply();
+  }
+  zoomAt(sx, sy, factor) {
+    const { w, h } = this.size();
+    if (sx == null) { sx = w / 2; sy = h / 2; }
+    const v = this.vp;
+    const k = Math.max(this.fitK * 0.5, Math.min(this.fitK * 60, v.k * factor));
+    const wx = (sx - v.x) / v.k, wy = (sy - v.y) / v.k;
+    this.vp = { k, x: sx - wx * k, y: sy - wy * k };
+    this.apply();
+  }
+  toWorld(cx, cy) {
+    const { left, top } = this.size();
+    return { x: (cx - left - this.vp.x) / this.vp.k, y: (cy - top - this.vp.y) / this.vp.k };
+  }
+  frac(w) { return [Math.min(1, Math.max(0, w.x / this.W)), Math.min(1, Math.max(0, w.y / this.H))]; }
+  /* Centre the view on a box in image pixels. */
+  showBox(x0, y0, x1, y1, minK) {
+    const { w, h } = this.size();
+    if (!w) return;
+    const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0);
+    const k = Math.min(this.fitK * 60, Math.max(minK || 0, Math.min(w / bw, h / bh) * 0.7));
+    this.vp = { k, x: w / 2 - ((x0 + x1) / 2) * k, y: h / 2 - ((y0 + y1) / 2) * k };
+    this.apply();
+  }
+  focusItem(kind, i) {
+    const it = this.listOf(kind)[i];
+    if (!it) return;
+    if (kind === 'area') {
+      const xs = it.pts.map((q) => q[0] * this.W), ys = it.pts.map((q) => q[1] * this.H);
+      this.showBox(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+    } else this.showBox(it.x * this.W - 1, it.y * this.H - 1, it.x * this.W + 1, it.y * this.H + 1, Math.max(this.vp.k, this.fitK * 3));
+    this.select(kind, i);
+  }
+  applyPending() {
+    const pd = this.pending || {};
+    this.pending = {};
+    if (!this.d.image) return;
+    const run = () => {
+      if (pd.focus) {
+        for (const kind of ['area', 'pin']) {
+          const i = this.listOf(kind).findIndex((x) => { const f = this.plugin.resolveLink(x.target, this.file); return f && f.path === pd.focus; });
+          if (i >= 0) { this.focusItem(kind, i); return; }
+        }
+      }
+      if (pd.place) { this.pendingPlace = pd.place; this.setMode('pin'); }
+      if (pd.draw) { this.pendingDraw = pd.draw; this.setMode('area'); }
+    };
+    window.requestAnimationFrame(() => { if (!this.fitted) this.fit(); run(); });
+  }
+
+  /* ---------- pointer: pan, pinch, drag pins and corners, place things ---------- */
+
+  bindPointer() {
+    const svg = this.svg;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    svg.addEventListener('pointerdown', (e) => {
+      if (e.button != null && e.button > 0) return;
+      svg.setPointerCapture(e.pointerId);
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size === 1) {
+        const el = e.target.closest && e.target.closest('[data-kind]');
+        const kind = el ? el.getAttribute('data-kind') : null;
+        const i = el ? Number(el.getAttribute('data-i')) : -1;
+        const base = { sx: e.clientX, sy: e.clientY, moved: false, kind, i };
+        if (kind === 'mid' && this.sel) {
+          const a = this.d.areas[this.sel.i];
+          const q = a.pts[i], n = a.pts[(i + 1) % a.pts.length];
+          a.pts.splice(i + 1, 0, [(q[0] + n[0]) / 2, (q[1] + n[1]) / 2]);
+          this.selVertex = i + 1;
+          this.drag = Object.assign(base, { vertex: i + 1, inserted: true });
+          this.drawFeatures();
+        } else if (kind === 'vertex') this.drag = Object.assign(base, { vertex: i });
+        else if ((kind === 'pin' || kind === 'label') && this.mode === 'select') this.drag = Object.assign(base, { item: true });
+        else this.drag = Object.assign(base, { pan: true, vx: this.vp.x, vy: this.vp.y });
+      } else if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        const { left, top } = this.size();
+        const mx = (a.x + b.x) / 2 - left, my = (a.y + b.y) / 2 - top;
+        this.pinch = { d: dist(a, b) || 1, k: this.vp.k, wx: (mx - this.vp.x) / this.vp.k, wy: (my - this.vp.y) / this.vp.k };
+        this.drag = null;
+      }
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!this.pointers.has(e.pointerId)) return;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pinch && this.pointers.size >= 2) {
+        const [a, b] = [...this.pointers.values()];
+        const { left, top } = this.size();
+        const k = Math.max(this.fitK * 0.5, Math.min(this.fitK * 60, this.pinch.k * (dist(a, b) / this.pinch.d)));
+        const mx = (a.x + b.x) / 2 - left, my = (a.y + b.y) / 2 - top;
+        this.vp = { k, x: mx - this.pinch.wx * k, y: my - this.pinch.wy * k };
+        this.apply();
+        return;
+      }
+      const d = this.drag;
+      if (!d) return;
+      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
+      d.moved = true;
+      if (d.pan) {
+        this.vp.x = d.vx + (e.clientX - d.sx);
+        this.vp.y = d.vy + (e.clientY - d.sy);
+        this.apply();
+        return;
+      }
+      this.dragging = true;
+      const [fx, fy] = this.frac(this.toWorld(e.clientX, e.clientY));
+      if (d.vertex != null && this.sel) {
+        this.d.areas[this.sel.i].pts[d.vertex] = [fx, fy];
+        this.selVertex = d.vertex;
+      } else if (d.item) {
+        const it = this.listOf(d.kind)[d.i];
+        it.x = fx; it.y = fy;
+        if (!this.sel || this.sel.kind !== d.kind || this.sel.i !== d.i) this.sel = { kind: d.kind, i: d.i };
+      }
+      if (!this.raf) this.raf = window.requestAnimationFrame(() => { this.raf = 0; this.drawFeatures(); });
+    });
+    const up = (e) => {
+      if (!this.pointers.has(e.pointerId)) return;
+      this.pointers.delete(e.pointerId);
+      if (this.pinch) { if (this.pointers.size < 2) this.pinch = null; return; }
+      const d = this.drag;
+      this.drag = null;
+      if (!d) return;
+      if (this.dragging || (d.inserted && d.moved)) { this.dragging = false; this.changed(); return; }
+      this.dragging = false;
+      if (d.inserted) { this.changed(); return; }
+      if (e.type !== 'pointerup') return;
+      this.tap(d, this.toWorld(e.clientX, e.clientY), e);
+    };
+    svg.addEventListener('pointerup', up);
+    svg.addEventListener('pointercancel', up);
+    svg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const { left, top } = this.size();
+      this.zoomAt(e.clientX - left, e.clientY - top, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));
+    }, { passive: false });
+    svg.addEventListener('contextmenu', (e) => {
+      const el = e.target.closest && e.target.closest('[data-kind]');
+      if (!el) return;
+      e.preventDefault();
+      const kind = el.getAttribute('data-kind'), i = Number(el.getAttribute('data-i'));
+      if (kind === 'vertex') { this.removeVertex(i); return; }
+      if (['pin', 'area', 'label'].includes(kind)) { this.select(kind, i); this.itemMenu(e, kind, i); }
+    });
+  }
+
+  tap(d, w, e) {
+    const now = Date.now();
+    const dbl = this.lastTap && now - this.lastTap.t < 320 && Math.hypot(e.clientX - this.lastTap.x, e.clientY - this.lastTap.y) < 12;
+    this.lastTap = { t: now, x: e.clientX, y: e.clientY };
+    if (this.mode === 'pin') { this.addPin(w); return; }
+    if (this.mode === 'label') { this.addLabel(w); return; }
+    if (this.mode === 'area') {
+      if (d.kind === 'first' || (dbl && this.draft.length >= 3)) { this.finishArea(); return; }
+      this.draft.push(this.frac(w));
+      this.drawEdit();
+      this.renderBar();
+      this.renderHint();
+      return;
+    }
+    if (d.kind === 'vertex') { this.selVertex = d.i; this.drawEdit(); this.renderCard(); return; }
+    if (['pin', 'area', 'label'].includes(d.kind)) {
+      if (dbl && this.sel && this.sel.kind === d.kind && this.sel.i === d.i) { this.openItem(d.kind, d.i); return; }
+      this.select(d.kind, d.i);
+      return;
+    }
+    this.select(null);
+  }
+  onKey(e) {
+    const t = e.target;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (e.key === 'Escape') {
+      if (this.mode === 'area' && this.draft.length) { this.draft = []; this.drawEdit(); this.renderBar(); this.renderHint(); }
+      else if (this.mode !== 'select') this.setMode('select');
+      else this.select(null);
+    } else if (e.key === 'Enter' && this.mode === 'area') { e.preventDefault(); this.finishArea(); }
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && this.sel) {
+      e.preventDefault();
+      if (this.sel.kind === 'area' && this.selVertex != null) this.removeVertex(this.selVertex);
+      else this.removeItem(this.sel.kind, this.sel.i);
+    } else if (e.key === '+' || e.key === '=') this.zoomAt(null, null, 1.4);
+    else if (e.key === '-') this.zoomAt(null, null, 1 / 1.4);
+  }
+
+  /* ---------- adding, changing, removing ---------- */
+
+  addPin(w) {
+    const [x, y] = this.frac(w);
+    const f = this.pendingPlace && this.app.vault.getAbstractFileByPath(this.pendingPlace);
+    const target = f instanceof TFile ? this.plugin.linkTo(f, this.file) : '';
+    this.d.pins.push({ target, x, y });
+    const i = this.d.pins.length - 1;
+    this.setMode('select');
+    this.sel = { kind: 'pin', i };
+    this.changed();
+    if (!target) this.chooseTarget('pin', i);
+  }
+  addLabel(w) {
+    const [x, y] = this.frac(w);
+    new NameModal(this.app, { title: 'Map label', placeholder: 'The Narrow Sea', cta: 'Add label' }, (text) => {
+      this.d.labels.push({ target: oneLine(text).replace(/\|/g, '/'), x, y });
+      this.sel = { kind: 'label', i: this.d.labels.length - 1 };
+      this.setMode('select');
+      this.changed();
+    }).open();
+  }
+  finishArea() {
+    if (this.draft.length < 3) { new Notice('An area needs at least three corners.'); return; }
+    const f = this.pendingDraw && this.app.vault.getAbstractFileByPath(this.pendingDraw);
+    const target = f instanceof TFile ? this.plugin.linkTo(f, this.file) : '';
+    this.d.areas.push({ target, pts: this.draft.slice(), color: '', years: '' });
+    const i = this.d.areas.length - 1;
+    this.draft = [];
+    this.setMode('select');
+    this.sel = { kind: 'area', i };
+    this.selVertex = null;
+    this.changed();
+    if (!target) this.chooseTarget('area', i);
+  }
+  chooseTarget(kind, i) {
+    const types = kind === 'area' ? [...PLACES, 'organization', 'culture', 'species', 'creature', 'plant', 'event', 'map'] : MAP_TARGETS;
+    new EntitySuggest(this.app, this.plugin, types, (f) => {
+      const it = this.listOf(kind)[i];
+      if (!it) return;
+      it.target = this.plugin.linkTo(f, this.file);
+      it.color = kind === 'area' ? it.color : '';
+      this.renderBar();
+      this.changed();
+    }, this.file).open();
+  }
+  nameItem(kind, i) {
+    const it = this.listOf(kind)[i];
+    new NameModal(this.app, { title: kind === 'label' ? 'Label text' : 'Name it without linking', initial: /^\[\[/.test(it.target) ? '' : it.target, cta: 'Save' }, (text) => {
+      it.target = oneLine(text).replace(/\|/g, '/');
+      this.renderBar();
+      this.changed();
+    }).open();
+  }
+  removeItem(kind, i) {
+    const list = this.listOf(kind);
+    if (!list[i]) return;
+    const go = () => { list.splice(i, 1); this.sel = null; this.selVertex = null; this.renderBar(); this.changed(); };
+    if (kind === 'area') new ConfirmModal(this.app, { title: `Remove ${this.info(list[i]).name} from the map?`, message: 'The shape you drew is removed. The entry itself is not touched.', cta: 'Remove' }, go).open();
+    else go();
+  }
+  removeVertex(j) {
+    if (!this.sel || this.sel.kind !== 'area') return;
+    const a = this.d.areas[this.sel.i];
+    if (a.pts.length <= 3) { new Notice('An area needs at least three corners.'); return; }
+    a.pts.splice(j, 1);
+    this.selVertex = null;
+    this.changed();
+  }
+  openItem(kind, i) {
+    const inf = this.info(this.listOf(kind)[i]);
+    if (inf.file) this.plugin.openEntity(inf.file);
+  }
+  select(kind, i) {
+    this.sel = kind ? { kind, i } : null;
+    this.selVertex = null;
+    this.drawFeatures();
+    this.renderCard();
+  }
+  itemMenu(e, kind, i) {
+    const it = this.listOf(kind)[i];
+    const inf = kind === 'label' ? null : this.info(it);
+    const m = new Menu();
+    if (inf && inf.file) addMenuItem(m, inf.type === 'map' ? 'Open map' : 'Open', 'arrow-up-right', () => this.openItem(kind, i));
+    if (kind !== 'label') addMenuItem(m, inf && (inf.file || inf.missing) ? 'Link to something else' : 'Link to an entry', 'link', () => this.chooseTarget(kind, i));
+    addMenuItem(m, kind === 'label' ? 'Change text' : 'Name it without linking', 'pencil', () => this.nameItem(kind, i));
+    addMenuItem(m, it.years ? `Years shown: ${it.years}` : 'Show only for some years…', 'calendar-range', () => this.editYears(kind, i));
+    if (kind === 'area' && this.timeOn) addMenuItem(m, `Redraw borders from ${this.fmtY(this.year)}`, 'git-branch', () => this.redrawFrom(i));
+    if (kind === 'pin' && inf && inf.file) addMenuItem(m, `Pin style for ${this.plugin.mapStyleLabel(this.pinStyle(inf).key)}…`, 'shapes', () => new MapKeyModal(this.app, this.plugin, this, this.pinStyle(inf).key).open());
+    if (kind === 'area') {
+      m.addSeparator();
+      /* A nation's or region's color belongs to the entry, so its settlements and every map follow it. */
+      const own = inf && inf.file && (inf.type === 'nation' || inf.type === 'region') ? inf.file : null;
+      const cur = own ? String(this.plugin.fm(own).color || '') : it.color || '';
+      const setColor = async (c) => {
+        if (own) {
+          await this.app.fileManager.processFrontMatter(own, (fm) => { if (c) fm.color = c; else delete fm.color; });
+          if (it.color) it.color = '';
+          this.plugin.dropGraph();
+          this.changed();
+        } else { it.color = c; this.changed(); }
+      };
+      if (own) m.addItem((x) => { x.setTitle(`${own.basename}'s color, on every map`); if (x.setIsLabel) x.setIsLabel(true); else x.setDisabled(true); });
+      for (const c of ['', ...COLORS_ALL]) m.addItem((x) => x.setTitle(c ? cap(c) : 'Automatic color').setChecked(cur === c).onClick(() => setColor(c)));
+      m.addItem((x) => x.setTitle(cur.startsWith('#') ? `Custom color (${cur})…` : 'Custom color…').setChecked(cur.startsWith('#')).onClick(() => new ColorModal(this.app, cur, setColor).open()));
+    }
+    m.addSeparator();
+    addMenuItem(m, 'Remove from map', 'trash-2', () => this.removeItem(kind, i), true);
+    m.showAtMouseEvent(e);
+  }
+
+  /* The selected pin, area or label, with what it links to. */
+  renderCard() {
+    const card = this.cardEl;
+    if (!card) return;
+    card.empty();
+    const s = this.sel;
+    const it = s && this.listOf(s.kind)[s.i];
+    card.toggle(!!it);
+    if (!it) return;
+    const p = this.plugin;
+    if (s.kind === 'label') {
+      card.className = 'ls-web-card ls-map-card ls-c-base';
+      card.removeAttribute('style');
+      const h = card.createDiv('ls-web-card-head');
+      h.createDiv({ cls: 'ls-web-card-title ls-map-card-name', text: it.target });
+      iconBtn(h, 'x', 'Close', () => this.select(null));
+      card.createDiv({ cls: 'ls-muted', text: it.years ? `A label, shown ${rangeText(rangeParts(it.years))}.` : 'A label. Drag it to move it.' });
+      const a = card.createDiv('ls-web-card-actions');
+      textBtn(a, 'Change text', () => this.nameItem('label', s.i));
+      textBtn(a, 'Years', () => this.editYears('label', s.i));
+      textBtn(a, 'Remove', () => this.removeItem('label', s.i));
+      return;
+    }
+    const inf = this.info(it);
+    card.className = `ls-web-card ls-map-card ${colorClass(inf.color)}`;
+    card.setAttr('style', colorStyle(inf.color));
+    const head = card.createDiv('ls-web-card-head');
+    if (inf.file && inf.type && TYPES[inf.type] && TYPES[inf.type].portrait) avatarEl(head, p, inf.file, 'is-medium');
+    const t = head.createDiv('ls-web-card-title');
+    const name = t.createEl(inf.file ? 'a' : 'div', { cls: 'ls-web-card-name', text: inf.name, attr: inf.file ? { href: '#' } : {} });
+    if (inf.file) name.addEventListener('click', (e) => { e.preventDefault(); this.openItem(s.kind, s.i); });
+    const sub = inf.file ? OverviewView.prototype.subtitle.call({ plugin: p, app: this.app }, inf.file, inf.type) : '';
+    t.createDiv({ cls: 'ls-entity-kind', text: inf.missing ? 'The note it linked to is gone' : inf.type ? [TYPES[inf.type].label, sub].filter(Boolean).join(', ') : inf.unnamed ? 'Not linked yet' : 'Not linked to an entry' });
+    iconBtn(head, 'x', 'Close', () => this.select(null));
+
+    if (inf.file && FOUNDING[inf.type] && this.timeOn) {
+      const G = this.yearG(this.year);
+      const t = this.timeInfo(inf.file);
+      const facts = card.createDiv('ls-hero-facts ls-map-facts');
+      iconText(facts, 'history', `In ${this.fmtY(this.year)}`, 'ls-fact');
+      const st = t.standing(G);
+      const called = t.nameAt(G);
+      if (st === 'before') iconText(facts, 'hourglass', 'Not there yet', 'ls-fact');
+      else {
+        if (called !== inf.file.basename) iconText(facts, 'tag', `Called ${called}`, 'ls-fact');
+        const h = t.holderAt(G);
+        if (h) iconText(facts, 'crown', `Held by ${h.text}`, 'ls-fact');
+        const gone = st === 'gone' ? t.goneSince(G) : null;
+        if (gone) iconText(facts, 'skull', `${gone.how || FOUNDING[inf.type].end} ${this.fmtY(this.yearOfG(gone.g))}`, 'ls-fact is-dead');
+      }
+    } else if (inf.file && FOUNDING[inf.type]) {
+      const facts = card.createDiv('ls-hero-facts ls-map-facts');
+      const own = p.ownershipOf(inf.file).filter((sg) => sg.status === 'now').pop();
+      if (own) iconText(facts, 'crown', `Held by ${own.holder.text}`, 'ls-fact');
+      const end = p.endOf(inf.file);
+      if (end) iconText(facts, 'skull', `${end.how || FOUNDING[inf.type].end} ${p.yearOf(end.pt)}`, 'ls-fact is-dead');
+    }
+    if (s.kind === 'pin' && inf.file) {
+      const st = this.pinStyle(inf);
+      const sr = card.createDiv({ cls: 'ls-map-style-line is-link', attr: { 'aria-label': 'Change how this type of place is drawn' } });
+      mapMarkerPreview(sr, st);
+      sr.createSpan({ text: `Drawn as ${p.mapStyleLabel(st.key).toLowerCase()}` });
+      const n = p.nationOf(inf.file);
+      if (n && n !== inf.file) sr.createSpan({ cls: 'ls-muted', text: `, in ${n.basename}'s color` });
+      sr.addEventListener('click', () => new MapKeyModal(this.app, p, this, st.key).open());
+    }
+    if (it.years) card.createDiv({ cls: 'ls-muted ls-map-years' + (it.badYears ? ' is-bad' : ''), text: it.badYears ? `Can't read the years "${it.years}"` : `This shape is shown ${rangeText(rangeParts(it.years))}` });
+    if (inf.file) {
+      const other = p.mapsWith(inf.file).filter((h) => h.map !== this.file);
+      if (other.length) {
+        const om = card.createDiv('ls-muted ls-map-also');
+        om.createSpan({ text: 'Also on ' });
+        other.forEach((h, j) => {
+          const a = om.createSpan({ cls: 'is-link', text: h.map.basename });
+          a.addEventListener('click', () => p.openMap(h.map, { focus: inf.file.path }));
+          if (j < other.length - 1) om.createSpan({ text: ', ' });
+        });
+      }
+    }
+    if (s.kind === 'area') card.createDiv({ cls: 'ls-muted ls-map-tip', text: 'Drag a corner to reshape it. Tap a small dot between corners to add one; right-click a corner (or tap it, then Remove corner) to take it away.' });
+    const a = card.createDiv('ls-web-card-actions');
+    if (inf.file) textBtn(a, inf.type === 'map' ? 'Open map' : 'Open', () => this.openItem(s.kind, s.i), 'mod-cta');
+    else textBtn(a, 'Link to an entry', () => this.chooseTarget(s.kind, s.i), 'mod-cta');
+    if (s.kind === 'area' && this.selVertex != null) textBtn(a, 'Remove corner', () => this.removeVertex(this.selVertex));
+    if (s.kind === 'area' && this.timeOn) textBtn(a, `Redraw from ${this.fmtY(this.year)}`, () => this.redrawFrom(s.i));
+    iconBtn(a, 'more-horizontal', 'More', (e) => this.itemMenu(e, s.kind, s.i));
+  }
+
+  /* ---------- image ---------- */
+
+  async setImage(f) {
+    await this.app.fileManager.processFrontMatter(this.file, (fm) => { fm.image = this.plugin.linkTo(f, this.file); });
+    this.selfWrite = 0;
+    await new Promise((r) => window.setTimeout(r, 300));
+    await this.load(true);
+  }
+  upload() {
+    const p = this.plugin;
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.addEventListener('change', async () => {
+      const file = inp.files && inp.files[0];
+      if (!file) return;
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      if (!IMAGE_EXT.includes(ext)) { new Notice('That file type isn\'t an image Obsidian can show.'); return; }
+      const folder = `${p.projectPath()}/${TYPES.map.folder}/Images`;
+      await p.ensureFolder(folder);
+      const base = sanitize(file.name.replace(/\.[^.]+$/, '')) || 'map';
+      const f = await this.app.vault.createBinary(p.uniquePath(folder, base, ext), await file.arrayBuffer());
+      await this.setImage(f);
+      new Notice(`Saved the image as ${f.path}.`);
+    });
+    inp.click();
+  }
+}
 
 module.exports = LoresmithPlugin;

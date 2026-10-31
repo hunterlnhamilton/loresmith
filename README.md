@@ -8,7 +8,8 @@ notes.
 - **Plain markdown, no database.** Every entry is a note with frontmatter, so your work stays readable without the
   plugin and works with the graph, backlinks, search, Dataview and Bases.
 - **Desktop and mobile.** No Node APIs, so it runs on desktop, iPad and phones.
-- **Theme-friendly.** Styling uses Obsidian's theme variables only, so your theme restyles it.
+- **Theme-friendly.** Colors and fonts come only from Obsidian's theme variables (interface and text fonts, UI sizes,
+  heading styles), so your theme, its Style Settings and Obsidian's font size restyle it.
 
 ## Contents
 
@@ -21,6 +22,7 @@ notes.
 - [Relationships](#relationships)
 - [Organizations, groups and roles](#organizations-groups-and-roles)
 - [Places](#places)
+- [Maps](#maps)
 - [Species, creatures and plants](#species-creatures-and-plants)
 - [Stories, chapters and scenes](#stories-chapters-and-scenes)
 - [Outlines and plot arcs](#outlines-and-plot-arcs)
@@ -70,22 +72,16 @@ Everything is a normal markdown note.
 ```
 Lore/
   Example Project/              ← a project
-    Arcs/                     ← story arcs (nice for plotting)
-    Bestiary/                     ← beasts
     Calendar.md                 ← the primary calendar
-    Calendars/Westerosi Calendar.md
-    Characters/Daenerys Targaryen.md 
-    Events/
-    Flora/                     ← plants
-    Holidays/
-    Nations/Westeros.md
-    Notes/                     ← drafting space outside of the story proper, scratch sheets
-    Regions/The North.md
-    Settlements/King's Landing.md
-    Locations/Crossroads Inn.md
-    Organizations/The Night's Watch.md
-    Events/The Red Wedding.md
-    Holidays/Maiden’s Day.md
+    Calendars/Coastal Calendar.md
+    Characters/Elena Hart.md
+    Nations/Kingdom of Westmarch.md
+    Regions/Grey Mountains.md
+    Settlements/Kingsport.md
+    Locations/The Crooked Lantern.md
+    Organizations/Lantern Guild.md
+    Events/Siege of Kingsport.md
+    Holidays/Midwinter Feast.md
     Stories/
       First Draft/
         First Draft.md          ← story note: synopsis, main characters, chapter order
@@ -150,7 +146,7 @@ suggest values you have already used, so "Noble" and "noble" don't become two gr
 | --- | --- |
 | People | Characters, Organizations, Cultures, Species |
 | Nature | Creatures (Bestiary), Plants (Flora) |
-| Places | Nations, Regions, Settlements, Locations |
+| Places | Nations, Regions, Settlements, Locations, Maps |
 | Things | Items, Discoveries, Relations |
 | History | Events, Holidays, Calendars, plus the Timeline and the Calendar page |
 | Language | Languages, Dictionary words |
@@ -254,10 +250,47 @@ roles:
 - **Subdivisions**: an organization that is **Part of** another (houses of a school, departments of a government,
   squads of an army) is a subdivision, at any depth. Its people also appear on the parent's page, labeled with their
   subdivision. Adding someone to the parent asks which subdivision they belong to.
+- **Ranks**: an organization with a hierarchy (an army, a knightly order, a church, a guild) can list its ranks,
+  highest first, in the **Ranks** section of its page. Reorder them with the arrows, rename them in place, or add the
+  titles people already hold with one tap. A person's rank is the first part of their title ("Knight, Order of the
+  Rose" is a Knight), and a rank can list other spellings ("Captain/Capt."). The People section is then listed in rank
+  order, the role editor suggests the ranks, **Groups and positions** says "rank 3 of 7", and subdivisions use their
+  parent's ranks until given their own. In the note they are a plain list:
+
+  ```yaml
+  ranks:
+    - Grand Master
+    - Knight-Commander
+    - Knight
+    - Squire
+  ```
+
 - **People section** on organization pages: everyone current, grouped by role or by subdivision, with earlier titles
   on each card. Former members follow in their own section, which you can hide.
 - **Groups and positions** on character sheets: every group they are or were in, with each title and its years,
   active ones first. The header shows their current titles.
+
+### Rulers of places
+
+**Leader of** also takes nations, settlements and locations, so a character can lead a noble house (an organization),
+rule a kingdom, be mayor of a town or command a keep. Their titles work the same way as roles in a group:
+
+```yaml
+leaderOf:
+  - "[[Ferelden]]"
+  - "[[Highever]]"
+roles:
+  - "[[Ferelden]]: King (9:10–9:25)"
+  - "[[Highever]]: Teyrn"
+  - "[[Fort Drakon]]: Commander (until 9:30)"
+```
+
+- Leader of is kept two-way with the place's **Ruled by** (and with a group's **Leaders**).
+- Nations, settlements and locations get a **Rulers** section: current rulers grouped by title, then **Former
+  rulers**. A ruler is former when their reign ended before the present date, when they're marked as no longer
+  active, or when they have died.
+- The pencil on a ruler's chip, on either page, sets their title and years. The character's **Groups and positions**
+  and header list the places they rule alongside their groups.
 
 ## Places
 
@@ -274,8 +307,10 @@ There are four kinds of place, because a kingdom isn't a culture, an organizatio
 
 - **Type** and **Status** ("Thriving", "In decline", "Fallen").
 - **Rule**: Government, Ruled by (characters or organizations), Ruling house, Capital, and **Part of** for a vassal,
-  province or member of a federation.
+  province or member of a federation. Rulers are listed, current and former, in the page's **Rulers** section (see
+  [Rulers of places](#rulers-of-places)).
 - **Land**: Territory (the regions it holds) and Population.
+- **Map color**: the color the nation, its areas and its settlements are drawn in on maps.
 - **People**: Cultures, Species, Languages, Faiths and Calendars, as many of each as you need, since a kingdom usually
   holds more than one people.
 - **Ties**: Allies, Rivals, At war with, and Currency.
@@ -286,13 +321,53 @@ The page shows how long it stood and how long ago it fell. Its founding and fall
 
 ### Regions
 
-Type, Part of (a larger region), Terrain, Climate, Population, Cultures and Languages. Sections: About, Geography,
-Climate, Ecology, History.
+Type, Part of (a larger region), Map color, Formed, Ended, Terrain, Climate, Population, Cultures and Languages. Sections: About,
+Geography, Climate, Ecology, History.
 
 ### Settlements
 
 Type, **Nation** (the nation it belongs to), **In** (the region it's in, or the city it's a district of), Ruled by,
-Population, Cultures, Languages, Founded and Status. Sections: About, Districts, People, Economy, History.
+Population, Cultures, Languages, Founded, Ended, How it ended and Status. Sections: About, Districts, People, Economy, History.
+
+### Locations
+
+Type, Part of, **Built**, **Ended**, **How it ended**, Ruled by, Population, Cultures and Languages.
+
+### When places began and ended
+
+Every kind of place, and every organization, has a start and an end date: a nation is **Founded** and **Fell**, a
+region is **Formed** and **Ended**, a settlement is **Founded**, a location is **Built**, an organization is
+**Founded** and **Dissolved**. **How it ended** says what happened ("Razed", "Conquered by Tevinter", "Sank"), and the
+timeline and calendar word it that way ("Kingsport is razed"). Both dates take any calendar. The page shows how long it
+stood and how long ago it began or ended, both dates go on the timeline and the Calendar page (with yearly
+anniversaries until it ends), and anything that has ended says so in its list.
+
+### Through history: names, owners, destruction
+
+A place or group that lives for centuries changes. **Through history** on its page (**Add a change**) records each
+change with its date:
+
+```yaml
+changes:
+  - "Renamed from Port Aldis to Kingsport (1050 AD)"
+  - "Conquered from [[Westmarch]] by [[Tevinter Imperium]] (12 Haring, 1102 AD), after a six-month siege"
+  - "Destroyed by [[The Blight]] (1130 AD)"
+  - "Rebuilt (1150 AD)"
+  - "Became independent (1200 AD)"
+  - "The great fire (1066 AD)"
+```
+
+- **What happened**: renamed; conquered, annexed, ceded, granted, inherited, sold, merged or changed hands; became
+  independent; besieged, sacked or occupied; destroyed, razed, abandoned, fell into ruin, sank or disbanded; rebuilt,
+  resettled, restored or refounded; or anything else as a dated note.
+- **Names**: the page says what it is called in the present day, the timeline uses the name it had at the time
+  ("Port Aldis is founded", "Kingsport is conquered by…"), and searching for an old name finds it.
+- **Owners**: the page lists everyone who held it, with years. On a settlement, nation or organization, whoever holds
+  it as of the present date is written into its **Nation** or **Part of** field, so the new owner's page lists it.
+  Nations and organizations get a **Held over time** section: what they hold now and what they held once.
+- **Standing**: a destruction that hasn't been rebuilt counts as its end, without needing the Ended field.
+- Every dated change goes on the timeline (filter by the nation to see what it won and lost) and on the Calendar
+  page.
 
 ### Linking places
 
@@ -310,6 +385,98 @@ menu.
 - Links keep working, and subfolders carry over (`Locations/North/Kingsport.md` becomes
   `Settlements/North/Kingsport.md`).
 - A city that was **Part of** a kingdom becomes a settlement of that nation.
+
+## Maps
+
+A map is an image with your world drawn onto it: pins for cities and buildings, outlined areas for nations and
+regions, and free text labels for seas and mountain ranges. Everything on it links to an entry.
+
+### Making a map
+
+**Maps** is under Places (or **Create map**). Name it, then **Upload an image** from your computer or tablet (it is saved
+in `Maps/Images/`) or **Choose from vault**. A map can be of anything: the world, a region, a city, a castle's floor
+plan, a battlefield. **Map of** (in the map's options) ties it to the place it shows.
+
+### Drawing on it
+
+| Tool | What it does |
+| --- | --- |
+| **Move and select** | Drag to pan, scroll or pinch to zoom. Tap a pin, area or label to see it; double-tap to open its entry. Drag pins and labels to move them. |
+| **Drop a pin** | Tap the map, then choose the entry it is (or create one). |
+| **Draw an area** | Tap each corner in turn. Tap the first corner, double-tap, or press Enter to finish, then choose the entry. Undo point and Cancel are in the toolbar. |
+| **Add a label** | Tap and type: "The Narrow Sea". |
+
+- **Reshaping an area**: select it, then drag its corners. The small dots between corners add a new corner where you
+  drag them. Right-click a corner, or tap it and press **Remove corner**, to take one away.
+- **Nation colors**: a nation has a **Map color** (on its page, or from its area's **…** menu). Its areas, and the
+  pins of every settlement and location inside it (through **Nation** or **Part of**), are drawn in that color on
+  every map. Without one, it gets a color from its name. Regions can have a Map color too; other areas get a color
+  from their name, or one you pick in the area's **…** menu, including any custom color.
+- **Pins by type**: each pin is drawn by its entry's **Type**. A "Capital City" (or any settlement a nation names as
+  its **Capital**) is a star; ports get an anchor, forts a castle, cities a large dot, villages a small one, and so
+  on. Nation areas are solid and region areas dashed.
+- **Map key**: the list button shows a key of what's on the map and the nations in it. Click a line (or **Pin
+  styles for each type of place…** in the map's options, or **Drawn as …** on a selected pin) to choose, for each
+  Type, the marker (dot, ring, square, diamond, triangle, star, or an icon such as an anchor, castle, temple or
+  tavern), its size, how its name is written (plain, bold, capitals, italics, with its type, or only on hover) and
+  whether the name shows when zoomed out. The choices apply to every map.
+- **Anything can be pinned**: places, characters, organizations, events, creatures, items, even another map. A pin
+  to a city's own map opens that map, so you can drill down from the world to a city to a building.
+- A pin or area can also just have a name, without linking to an entry ("Old watchtower").
+- **Show** chips filter what is on the map by kind; **Find on map** jumps to anything by name.
+- The card for a selected place shows who holds it now and whether it has fallen, from its
+  [history](#through-history-names-owners-destruction), and which other maps it is on.
+- Keys: Esc cancels or deselects, Delete removes the selection, + and − zoom.
+
+### Through time
+
+The clock button opens the **year slider**. Drag it, press play to run through the years, or type any date in any
+calendar. **Years in** works like the timeline's: count in any of your calendars, or **In use at the time**, which shows
+each year in the calendar people used then. It starts on the timeline's choice and remembers its own after that. The
+slider spans everything dated on the map, or your whole timeline while the map has nothing dated yet. At each year:
+
+- Places appear from the year they were founded, built or formed. A destroyed or abandoned settlement or building
+  shows as ruins (a hollow pin) until it is rebuilt; a nation or region that fell disappears.
+- Names are the ones used at the time: "Port Aldis" before 1050, "Kingsport" after.
+- **Color by holder** colors every place by whoever held it that year, from its
+  [history](#through-history-names-owners-destruction). Draw each province or territory as its own area, and as they
+  are conquered, ceded or inherited they turn the conqueror's color, so you watch empires grow and shrink.
+- The selected place's card says what it was called, who held it and whether it still stood that year.
+
+**Borders that move.** Any pin, area or label can be shown for only some years ("900 – 1102", "from 1102",
+"until 1200"; **Show only for some years…** in its menu). To change a border, move the slider to the year it changes,
+select the area and press **Redraw from** *that year*: the old shape now ends the year before and a copy starts that
+year, ready to reshape. Without the slider open, the map shows each shape as it stands at the present day.
+
+### On entry pages
+
+Every entry on a map gets an **On the map** section: a cropped preview of each map it is on, which opens the map
+centred on it. **Place a pin on a map** and **Draw it on a map** there (or the **Place the current entry on a map**
+command) open a map ready to place that entry.
+
+### How maps are stored
+
+The map note keeps everything as positions on the image (0 to 1 across and down), so a redrawn or higher-resolution
+image of the same map keeps every pin in place:
+
+```yaml
+type: map
+image: "[[world.png]]"
+of: "[[The Known World]]"
+pins:
+  - "[[Kingsport]] | 0.51234, 0.33410"
+  - "Old watchtower | 0.20000, 0.30000"
+areas:
+  - "[[Westmarch]] | 0.1200,0.3000 0.1800,0.3300 0.2000,0.4100 | red | 900 – 1101"
+  - "[[Westmarch]] | 0.1200,0.3000 0.1600,0.3100 0.1700,0.3800 | red | from 1102"
+labels:
+  - "The Narrow Sea | 0.40000, 0.61000"
+places:
+  - "[[Kingsport]]"
+  - "[[Westmarch]]"
+```
+
+An area's color can be a theme color name or a hex color ("#3a7bd5"). The years a shape is shown are optional, last on its line. `places` lists every linked entry so backlinks and the graph see them. Renaming an entry updates its pins and areas.
 
 ## Species, creatures and plants
 
@@ -425,8 +592,8 @@ Older notes that used **Sort year** and an **Ends** year still read the same.
 
 ### Timeline
 
-Events in historical order, grouped by era, with characters' births and deaths and the foundings and falls of
-organizations, nations and settlements. Filter to one character, organization, culture or plot arc. Characters get a
+Events in historical order, grouped by era, with characters' births and deaths and when organizations and places
+were founded, formed or built and when they ended. Filter to one character, organization, culture or plot arc. Characters get a
 Timeline section, arcs an Events section.
 
 - Every date is sorted by the day it falls on, whatever calendar it's written in. An event sorts by the day it starts.
@@ -514,8 +681,11 @@ the editor fills in each of these:
 | Negative years, then ages | Old Era (Old), up to -1 · First Age (First), 100 years · Second Age (Second), 100 years … | -1195 Old, 1:1 First, 9:41 Ninth |
 | Eras of different lengths | Before the Eras (BE), down to 1 · First Era (1E), 2920 years · Second Era (2E), 896 years · Third Era (3E), 433 years · Fourth Era (4E), open | 500 BE, 1E 2920, 4E 201 |
 
-- **Then keep adding eras of N years**: eras of that length keep coming after the last one listed, numbered until you
-  name them ("10:5"). Write "?" as the name of an era that isn't named yet.
+- **After the last era**: if the last era listed has a length, another era of the same length follows when it ends,
+  and another after that, numbered until you name them. They count their years the way your last era does, so ages
+  of 9:00–9:99 go on to 10:00, and ages of 1:1–1:100 go on to 2:1. **Then keep adding eras of N years** sets a
+  different length. Leave the last era's length blank for an era that runs on (AD, 4E). Write "?" as the name of an
+  era that isn't named yet.
 - **Skip year 0** for a count that goes … -1, 1 … instead of … -1, 0, 1 ….
 - **Years are written** sets the default pattern, and each era can have its own:
 
@@ -524,12 +694,13 @@ the editor fills in each of these:
 | `{y} {short}` | 1041 AF |
 | `{short} {y}` | AD 1041, 4E 201 |
 | `{n}:{y} {short}` | 9:41 Ninth |
+| `{n}:{yy} {short}` | 9:05 Ninth (years always two digits) |
 | `{y} {name}` | 41 Ninth Age |
 | `Year {y} of the {name}` | Year 41 of the Ninth Age |
 | `{y} {ord} {word}` | 41 9th Age |
 | `{roman}.{y}` | IX.41 |
 
-`{y}` is the year within the era, `{n}` the era's number (the first era that counts up is 1), `{ord}` "9th",
+`{y}` is the year within the era (`{yy}` with at least two digits), `{n}` the era's number (the first era that counts up is 1), `{ord}` "9th",
 `{roman}` "IX", `{word}` what eras are called (Age, Era). Any of these spellings is understood when you type a date,
 so "Ninth 41", "9:41" and "9:41 Ninth" are the same year. Under every era the editor shows the years it covers as
 they'll be written, and warns if two years would read the same.
@@ -895,6 +1066,8 @@ details go under **Settings → Loresmith → Manuscript and ebook**.
 | Add an empty characters property to scenes that lack one | Prepares older scenes for scene casts |
 | Open relations web | Opens the relations web |
 | Open timeline / Open calendar | Opens the timeline or the Calendar page |
+| Open a map / Create map | Opens or makes a map |
+| Place the current entry on a map | Opens a map ready to pin or draw the entry you are in |
 | Open calendar note | Opens a calendar's note, asking which one |
 | Edit a calendar | Opens the calendar editor |
 | Create calendar | Makes a new calendar from a template or a copy |
